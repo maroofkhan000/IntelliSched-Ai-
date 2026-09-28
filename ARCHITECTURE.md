@@ -1,3 +1,5 @@
+
+
 # IntelliSched AI — System Architecture
 
 Grounded in `PROJECT_OVERVIEW.md` (synopsis + research-gap + SRS) and the actual `timetable_dataset.xlsx` schema. This is the implementation-level architecture the three source reports describe only at a proposal level.

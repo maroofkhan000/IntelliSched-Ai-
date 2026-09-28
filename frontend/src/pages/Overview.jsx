@@ -6,7 +6,7 @@ import { computeHealth } from '../health'
 import { TABLES, TABLE_ORDER } from '../schema'
 import { useStore } from '../store'
 
-const SETUP = ['Branches', 'TimeSlots', 'Rooms', 'Subjects', 'Sections', 'Teachers', 'TeacherPreferences', 'TeacherSubjectMap']
+const SETUP = ['Branches', 'TimeSlots', 'Rooms', 'Subjects', 'Sections', 'Teachers', 'TeacherSubjectMap']
 
 export default function Overview() {
   const { db, isAdmin, importRows, clearAll, activeDb } = useStore()
@@ -65,7 +65,7 @@ export default function Overview() {
       </div>
 
       <div className="tiles">
-        {TABLE_ORDER.map((n) => {
+        {TABLE_ORDER.filter((n) => n !== 'TeacherPreferences').map((n) => {
           const pend = db[n].filter((r) => r._status === 'pending').length
           return (
             <Tilt key={n} to={`/table/${n}`} className="tile">

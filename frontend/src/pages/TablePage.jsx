@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, Navigate, useParams } from 'react-router-dom'
+import { Navigate, useParams } from 'react-router-dom'
 import AssignmentTools from '../components/AssignmentTools'
 import DataTable from '../components/DataTable'
 import RowForm from '../components/RowForm'
@@ -7,26 +7,18 @@ import { exportSheet } from '../excel'
 import { TABLES } from '../schema'
 import { useStore } from '../store'
 
-// tables that live together on one page, shown as tabs
-const TAB_GROUPS = [['Teachers', 'TeacherPreferences']]
-
 export default function TablePage() {
   const { name } = useParams()
   const { db, canEditTable, isAdmin } = useStore()
   const [form, setForm] = useState(null) // null | { row? }
   const t = TABLES[name]
+  // preferences are entered inside the teacher form, so there is no separate page for them
+  if (name === 'TeacherPreferences') return <Navigate to="/table/Teachers" replace />
   if (!t) return <Navigate to="/" replace />
   const editable = canEditTable(name)
 
-  const tabs = TAB_GROUPS.find((g) => g.includes(name))
-
   return (
     <>
-      {tabs && (
-        <div className="seg tabs" role="tablist">
-          {tabs.map((k) => <Link key={k} to={`/table/${k}`} role="tab" aria-selected={k === name} className={k === name ? 'on' : ''}>{TABLES[k].icon} {TABLES[k].label} <span className="cnt">{db[k].length}</span></Link>)}
-        </div>
-      )}
       <div className="page-head">
         <div>
           <h1>{t.icon} {t.label}</h1>
