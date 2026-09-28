@@ -168,14 +168,21 @@ export function StoreProvider({ children }) {
   const deleteRows = useCallback((table, ids) => guard(async () => {
     await api(`/databases/${active.id}/tables/${table}/rows/delete`, { method: 'POST', body: { ids } })
     const gone = new Set(ids)
-    patchTable(table, (rows) => rows.filter((r) => !gone.has(r._id)))
+    setActive((a) => {
+      const tids = table === 'Teachers' ? new Set(a.data.Teachers.filter((r) => gone.has(r._id)).map((r) => r.TeacherID)) : null
+      return { ...a, data: { ...a.data, [table]: a.data[table].filter((r) => !gone.has(r._id)), ...(tids ? { TeacherPreferences: a.data.TeacherPreferences.filter((p) => !tids.has(p.TeacherID)) } : {}) } }
+    })
     refreshList()
   }).catch(() => {}), [guard, active?.id, refreshList])
 
   const setStatus = useCallback((table, ids, status) => guard(async () => {
     await api(`/databases/${active.id}/tables/${table}/status`, { method: 'POST', body: { ids, status } })
     const set = new Set(ids)
-    patchTable(table, (rows) => (status === 'rejected' ? rows.filter((r) => !set.has(r._id)) : rows.map((r) => (set.has(r._id) ? { ...r, _status: status } : r))))
+    const apply = (rows, hit) => (status === 'rejected' ? rows.filter((r) => !hit(r)) : rows.map((r) => (hit(r) ? { ...r, _status: status } : r)))
+    setActive((a) => {
+      const tids = table === 'Teachers' ? new Set(a.data.Teachers.filter((r) => set.has(r._id)).map((r) => r.TeacherID)) : null
+      return { ...a, data: { ...a.data, [table]: apply(a.data[table], (r) => set.has(r._id)), ...(tids ? { TeacherPreferences: apply(a.data.TeacherPreferences, (p) => tids.has(p.TeacherID)) } : {}) } }
+    })
   }).catch(() => {}), [guard, active?.id])
 
   // Merge rows (e.g. from an Excel file). Rows with the same key are replaced.

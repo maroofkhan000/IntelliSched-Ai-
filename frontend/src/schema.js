@@ -105,7 +105,7 @@ export const TABLES = {
   Teachers: {
     label: 'Teachers',
     icon: '🧑‍🏫',
-    hint: 'Faculty and their maximum weekly teaching load',
+    hint: 'Faculty, their maximum weekly load and the subjects they want to teach (added in the same form)',
     key: ['TeacherID'],
     filterBy: 'BranchCode',
     columns: [

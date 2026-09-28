@@ -194,16 +194,26 @@ app.post('/api/databases/:id/tables/:table/rows/delete', withDb, withTable, wrap
   const ids = Array.isArray(req.body?.ids) ? req.body.ids : []
   const filter = { dbId: req.dbDoc._id, table: req.params.table, _id: { $in: ids } }
   if (req.user.role !== 'admin') Object.assign(filter, { _status: 'pending', _by: req.user.username })
+  const gone = req.params.table === 'Teachers' ? (await store.rows.find(filter).toArray()).map((t) => t.TeacherID) : []
   const r = await store.rows.deleteMany(filter)
+  if (gone.length) await store.rows.deleteMany({ dbId: req.dbDoc._id, table: 'TeacherPreferences', TeacherID: { $in: gone } })
   res.json({ deleted: r.deletedCount })
 }))
 
 app.post('/api/databases/:id/tables/:table/status', adminOnly, withDb, withTable, wrap(async (req, res) => {
   const { ids = [], status } = req.body ?? {}
   const filter = { dbId: req.dbDoc._id, table: req.params.table, _id: { $in: ids } }
-  if (status === 'rejected') await store.rows.deleteMany(filter)
-  else if (status === 'approved') await store.rows.updateMany(filter, { $set: { _status: 'approved' } })
-  else return fail(res, 400, 'Status must be approved or rejected.')
+  if (status !== 'rejected' && status !== 'approved') return fail(res, 400, 'Status must be approved or rejected.')
+  // a teacher's preferences are entered with the teacher, so they follow the teacher's decision
+  const tids = req.params.table === 'Teachers' ? (await store.rows.find(filter).toArray()).map((t) => t.TeacherID) : []
+  const prefFilter = { dbId: req.dbDoc._id, table: 'TeacherPreferences', TeacherID: { $in: tids } }
+  if (status === 'rejected') {
+    await store.rows.deleteMany(filter)
+    if (tids.length) await store.rows.deleteMany(prefFilter)
+  } else {
+    await store.rows.updateMany(filter, { $set: { _status: 'approved' } })
+    if (tids.length) await store.rows.updateMany(prefFilter, { $set: { _status: 'approved' } })
+  }
   res.json({ ok: true })
 }))
 

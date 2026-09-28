@@ -21,6 +21,14 @@ export default function DataTable({ table, onEdit }) {
     for (const c of t.columns) if (c.type === 'ref' && c.refLabel) m[c.key] = new Map((db[c.ref] || []).map((r) => [String(r[c.refKey]), r[c.refLabel]]))
     return m
   }, [db, t])
+  // Teachers table: each teacher's subject preferences, best priority first
+  const prefsByTeacher = useMemo(() => {
+    const m = new Map()
+    if (table !== 'Teachers') return m
+    for (const p of db.TeacherPreferences) m.set(p.TeacherID, [...(m.get(p.TeacherID) ?? []), p])
+    for (const list of m.values()) list.sort((a, b) => Number(a.Priority) - Number(b.Priority))
+    return m
+  }, [db.TeacherPreferences, table])
 
   const filterOptions = useMemo(() => (t.filterBy ? [...new Set(rows.map((r) => r[t.filterBy]))].sort() : []), [rows, t])
 
@@ -103,6 +111,7 @@ export default function DataTable({ table, onEdit }) {
             <tr>
               <th className="rownum"><input type="checkbox" checked={allOnPage} onChange={togglePage} aria-label="Select page" /></th>
               {t.columns.map(head)}
+              {table === 'Teachers' && <th>Subject preferences</th>}
               <th>Status</th>
               <th>Entered by</th>
               {editable && <th />}
@@ -110,7 +119,7 @@ export default function DataTable({ table, onEdit }) {
           </thead>
           <tbody>
             {slice.length === 0 && (
-              <tr><td colSpan={t.columns.length + 4} className="none">{rows.length ? 'No rows match your filters.' : 'No data yet — add a row or import an Excel file.'}</td></tr>
+              <tr><td colSpan={t.columns.length + 5} className="none">{rows.length ? 'No rows match your filters.' : 'No data yet — add a row or import an Excel file.'}</td></tr>
             )}
             {slice.map((r, i) => (
               <tr key={r._id} className={sel.has(r._id) ? 'selected' : ''}>
@@ -119,6 +128,12 @@ export default function DataTable({ table, onEdit }) {
                   <span>{cur * PAGE + i + 1}</span>
                 </td>
                 {t.columns.map((c) => <td key={c.key} className={c.type === 'number' ? 'num' : ''}>{cell(r, c)}</td>)}
+                {table === 'Teachers' && (
+                  <td className="prefcell">
+                    {(prefsByTeacher.get(r.TeacherID) ?? []).map((p) => <span key={p.SubjectCode} className="tag" title={`Priority ${p.Priority} · ${p.ExperienceYears ?? 0} yrs · ${p.ResearchPapers ?? 0} papers`}>{p.SubjectCode} · P{p.Priority}</span>)}
+                    {!prefsByTeacher.has(r.TeacherID) && <span className="empty">—</span>}
+                  </td>
+                )}
                 <td><span className={`badge ${r._status}`}>{r._status}</span></td>
                 <td className="sub">{r._by}</td>
                 {editable && (
