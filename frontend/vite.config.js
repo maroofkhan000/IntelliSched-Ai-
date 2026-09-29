@@ -4,5 +4,6 @@ import { defineConfig } from 'vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  server: { proxy: { '/api': 'http://localhost:4000' } },
+  // fs.allow: src/schema.js re-exports ../backend/src/schema.js, which sits outside this folder.
+  server: { proxy: { '/api': 'http://localhost:4000' }, fs: { allow: ['..'] } },
 })
