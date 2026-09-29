@@ -35,5 +35,12 @@ export function computeHealth(db) {
   const hasLab = subjects.some((s) => s.Type === 'Lab')
   const labRooms = rooms.filter((r) => r.RoomType === 'Lab').length
 
-  return { demand, supply, unassigned, overloaded, tooBig, noPrefs, maxClass, hasLab, labRooms, counts: { sections: sections.length, subjects: subjects.length, teachers: teachers.length, rooms: rooms.length, slots: slots.length, map: map.length } }
+  // buildings: every room's block should be listed, and every pair of listed blocks needs a walking time
+  const blocks = [...new Set(ok(db.Buildings).map((b) => b.BuildingCode))].sort()
+  const unknownBlocks = blocks.length ? [...new Set(rooms.map((r) => String(r.Building ?? '').trim().toUpperCase()).filter((b) => b && !blocks.includes(b)))].sort() : []
+  const walks = new Set(ok(db.BuildingTravel).flatMap((t) => [`${t.FromBuilding}|${t.ToBuilding}`, `${t.ToBuilding}|${t.FromBuilding}`]))
+  const missingWalk = []
+  for (let i = 0; i < blocks.length; i++) for (let j = i + 1; j < blocks.length; j++) if (!walks.has(`${blocks[i]}|${blocks[j]}`)) missingWalk.push(`${blocks[i]} ↔ ${blocks[j]}`)
+
+  return { demand, supply, unassigned, overloaded, tooBig, noPrefs, maxClass, hasLab, labRooms, blocks, unknownBlocks, missingWalk, counts: { sections: sections.length, subjects: subjects.length, teachers: teachers.length, rooms: rooms.length, slots: slots.length, map: map.length } }
 }

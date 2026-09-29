@@ -7,13 +7,18 @@
 //   teacher assignments -> who teaches which subject to which section
 //   teachers  -> weekly load limit
 //   rooms     -> classrooms for theory, labs for lab subjects (capacity checked)
+//   teacher unavailability -> slots (or whole days) a teacher cannot teach
+//   buildings / travel     -> walking minutes between blocks (a room's block is its Building)
 //
 // Hard rules: a section, teacher or room is never in two places in one period; only open
-// cells are used; a teacher never exceeds their weekly load; lab sessions are 2 back-to-back
-// periods on one day and never straddle a break.
-// Soft rules (scored): spread a subject across days, keep each section's and teacher's day balanced.
+// cells are used; a teacher never exceeds their weekly load or teaches when marked unavailable;
+// lab sessions are 2 back-to-back periods on one day and never straddle a break; when a teacher's
+// next class that day is in another block, the gap between the two classes must cover the walk
+// (+ the teacher's extra travel minutes), and they never change blocks more than their daily max.
+// Soft rules (scored): spread a subject across days, keep each section's and teacher's day balanced,
+// keep a teacher in one block (and in their home block) as much as possible.
 // It is a greedy search restarted several times with random tie-breaks; the best run wins.
-import { WEEK, breakAfter, effectiveTimings } from './schema'
+import { WEEK, breakAfter, effectiveTimings, toMin } from './schema'
 
 const approved = (rows = []) => rows.filter((r) => r._status === 'approved')
 
@@ -39,6 +44,30 @@ export function generateTimetable({ db, settings, scope = {}, tries = 30 }) {
   const rooms = approved(db.Rooms)
   const assignments = approved(db.TeacherSubjectMap)
   if (!sections.length) return { error: 'No approved sections match this scope.' }
+
+  // ---- teacher unavailability: "TeacherID|Day|Period", or "TeacherID|Day|*" for the whole day ----
+  const away = new Set(approved(db.TeacherAvailability).map((a) => `${a.TeacherID}|${a.Day}|${a.Period === '' || a.Period == null ? '*' : Number(a.Period)}`))
+  const unavailable = (tid, d, p) => away.has(`${tid}|${d}|*`) || away.has(`${tid}|${d}|${p}`)
+
+  // ---- moving between buildings ----
+  const blockOf = (room) => String(room.Building ?? '').trim().toUpperCase()
+  const walk = new Map()
+  for (const t of approved(db.BuildingTravel)) {
+    walk.set(`${t.FromBuilding}|${t.ToBuilding}`, Number(t.WalkMinutes) || 0)
+    walk.set(`${t.ToBuilding}|${t.FromBuilding}`, Number(t.WalkMinutes) || 0)
+  }
+  const timings = effectiveTimings(settings)
+  // minutes between the end of period a and the start of period b (b > a) on any day;
+  // without timings, assume 50-minute periods with no breaks
+  const gapMinutes = (a, b) => {
+    const e = timings[a]?.end, st = timings[b]?.start
+    return e && st ? toMin(st) - toMin(e) : (b - a - 1) * 50
+  }
+  const walkNeed = (teacher, x, y) => {
+    if (x === y) return 0
+    return (walk.get(`${x}|${y}`) ?? 0) + (Number(teacher.ExtraTravelMinutes) || 0)
+  }
+  const maxChanges = (teacher) => (teacher.MaxBuildingChanges === '' || teacher.MaxBuildingChanges == null ? Infinity : Number(teacher.MaxBuildingChanges))
 
   // ---- turn the syllabus into sessions to place ----
   const jobs = []
@@ -71,7 +100,22 @@ export function generateTimetable({ db, settings, scope = {}, tries = 30 }) {
     const bump = (k, n = 1) => cnt.set(k, (cnt.get(k) ?? 0) + n)
     const get = (k) => cnt.get(k) ?? 0
     const placed = [], notPlaced = []
+    const dayPlan = new Map() // "TeacherID|Day" -> [{ from, to, block }] classes already placed that day
     let small = 0
+
+    // would a class in `block` over periods p..q fit the teacher's walking between blocks that day?
+    // returns the number of block changes that day if it fits, or -1 if it doesn't
+    const travelCheck = (teacher, d, p, q, block) => {
+      const seq = [...(dayPlan.get(`${teacher.TeacherID}|${d}`) ?? []), { from: p, to: q, block }].sort((a, b) => a.from - b.from)
+      let changes = 0
+      for (let i = 1; i < seq.length; i++) {
+        const a = seq[i - 1], b = seq[i]
+        if (a.block === b.block) continue
+        changes++
+        if (gapMinutes(a.to, b.from) < walkNeed(teacher, a.block, b.block)) return -1
+      }
+      return changes > maxChanges(teacher) ? -1 : changes
+    }
 
     const order = jobs.map((j) => ({ j, r: Math.random() })).sort((a, b) =>
       (b.j.lab - a.j.lab) || (b.j.len - a.j.len) || (teacherDemand.get(b.j.teacher.TeacherID) - teacherDemand.get(a.j.teacher.TeacherID)) || (jitter ? a.r - b.r : 0)).map((x) => x.j)
@@ -81,26 +125,47 @@ export function generateTimetable({ db, settings, scope = {}, tries = 30 }) {
       const load = get(`load|${teacher.TeacherID}`)
       if (load + len > Number(teacher.MaxWeeklyLoad)) { notPlaced.push({ ...j.base, periods: len, reason: `Teacher ${teacher.TeacherID} would exceed max weekly load (${teacher.MaxWeeklyLoad}h)` }); continue }
       let best = null
+      let walkBlocked = false
+      const home = String(teacher.HomeBuilding ?? '').trim().toUpperCase()
       for (const d of days) {
         for (let p = 1; p + len - 1 <= P; p++) {
           let ok = true
           for (let i = 0; i < len && ok; i++) {
             const q = p + i
-            if (!isOpen(d, q) || secBusy.has(`${sec.SectionID}|${d}|${q}`) || teaBusy.has(`${teacher.TeacherID}|${d}|${q}`)) ok = false
+            if (!isOpen(d, q) || unavailable(teacher.TeacherID, d, q) || secBusy.has(`${sec.SectionID}|${d}|${q}`) || teaBusy.has(`${teacher.TeacherID}|${d}|${q}`)) ok = false
             if (i > 0 && breakAfter(settings, q - 1)) ok = false // never run one session across a break
           }
           if (!ok) continue
-          // a room free for every period of the session: smallest one that seats the section
+          // a room free for every period of the session that seats the section (labs may fall back
+          // to the largest free lab: batches assumed) and that the teacher can walk to in time;
+          // fewest block changes first, then the home block, then the smallest room
           const free = pool.filter((r) => Array.from({ length: len }, (_, i) => !roomBusy.has(`${r.RoomID}|${d}|${p + i}`)).every(Boolean))
-          let room = free.find((r) => Number(r.Capacity) >= strength)
-          let undersized = false
-          if (!room && lab && free.length) { room = free[free.length - 1]; undersized = true } // labs assume batches
-          if (!room) continue
-          const score = get(`sd|${sec.SectionID}|${sub.SubjectCode}|${d}`) * 10 + get(`s|${sec.SectionID}|${d}`) * 2 + get(`t|${teacher.TeacherID}|${d}`) + (jitter ? Math.random() * 3 : 0)
+          const fits = free.filter((r) => Number(r.Capacity) >= strength)
+          const undersized = !fits.length && lab && free.length > 0
+          const candidates = fits.length ? fits : undersized ? [free[free.length - 1]] : []
+          if (!candidates.length) continue
+          const byBlock = new Map()
+          const options = []
+          for (const r of candidates) {
+            const b = blockOf(r)
+            if (!byBlock.has(b)) byBlock.set(b, travelCheck(teacher, d, p, p + len - 1, b))
+            const changes = byBlock.get(b)
+            if (changes >= 0) options.push({ r, changes, away: home && b !== home ? 1 : 0 })
+          }
+          if (!options.length) { walkBlocked = true; continue }
+          options.sort((a, b) => (a.changes - b.changes) || (a.away - b.away) || (Number(a.r.Capacity) - Number(b.r.Capacity)))
+          const { r: room, changes, away: notHome } = options[0]
+          const score = get(`sd|${sec.SectionID}|${sub.SubjectCode}|${d}`) * 10 + get(`s|${sec.SectionID}|${d}`) * 2 + get(`t|${teacher.TeacherID}|${d}`) + changes * 4 + notHome + (jitter ? Math.random() * 3 : 0)
           if (!best || score < best.score) best = { d, p, room, score, undersized }
         }
       }
-      if (!best) { notPlaced.push({ ...j.base, periods: len, reason: 'No free slot (clashes with other classes, or the teacher or rooms are fully booked)' }); continue }
+      if (!best) {
+        const reason = walkBlocked
+          ? `No slot where teacher ${teacher.TeacherID} has time to walk between buildings (or they'd exceed their daily building changes)`
+          : 'No free slot (clashes with other classes, the teacher is unavailable, or the teacher or rooms are fully booked)'
+        notPlaced.push({ ...j.base, periods: len, reason })
+        continue
+      }
       const { d, p, room, undersized } = best
       for (let i = 0; i < len; i++) {
         secBusy.add(`${sec.SectionID}|${d}|${p + i}`)
@@ -108,19 +173,33 @@ export function generateTimetable({ db, settings, scope = {}, tries = 30 }) {
         roomBusy.add(`${room.RoomID}|${d}|${p + i}`)
         placed.push({ SectionID: sec.SectionID, Day: d, Period: p + i, SubjectCode: sub.SubjectCode, SubjectName: sub.SubjectName, Type: sub.Type, TeacherID: teacher.TeacherID, TeacherName: teacher.Name, RoomID: room.RoomID, ...(i > 0 ? { cont: true } : {}) })
       }
+      const plan = dayPlan.get(`${teacher.TeacherID}|${d}`) ?? []
+      plan.push({ from: p, to: p + len - 1, block: blockOf(room) })
+      dayPlan.set(`${teacher.TeacherID}|${d}`, plan)
       if (undersized) small++
       bump(`sd|${sec.SectionID}|${sub.SubjectCode}|${d}`, len)
       bump(`s|${sec.SectionID}|${d}`, len)
       bump(`t|${teacher.TeacherID}|${d}`, len)
       bump(`load|${teacher.TeacherID}`, len)
     }
-    return { placed, notPlaced, small }
+    let blockChanges = 0
+    const missingWalk = new Set() // block changes with no travel time entered (treated as 0 minutes)
+    for (const plan of dayPlan.values()) {
+      const seq = [...plan].sort((a, b) => a.from - b.from)
+      for (let i = 1; i < seq.length; i++) {
+        const x = seq[i - 1].block, y = seq[i].block
+        if (x === y) continue
+        blockChanges++
+        if (walk.size && !walk.has(`${x}|${y}`)) missingWalk.add([x, y].sort().join(' ↔ '))
+      }
+    }
+    return { placed, notPlaced, small, blockChanges, missingWalk: [...missingWalk].sort() }
   }
 
   let best = null
   for (let i = 0; i < tries; i++) {
     const r = run(i > 0)
-    if (!best || r.placed.length > best.placed.length) best = r
+    if (!best || r.placed.length > best.placed.length || (r.placed.length === best.placed.length && r.blockChanges < best.blockChanges)) best = r
     if (!best.notPlaced.length) break
   }
 
@@ -138,6 +217,6 @@ export function generateTimetable({ db, settings, scope = {}, tries = 30 }) {
     scope: { term: scope.term || 'all', branch: scope.branch || '' },
     entries: best.placed,
     unscheduled,
-    stats: { sections: sections.length, demand, scheduled: best.placed.length, unscheduled: notDone, undersizedLabs: best.small, timings: effectiveTimings(settings) },
+    stats: { sections: sections.length, demand, scheduled: best.placed.length, unscheduled: notDone, undersizedLabs: best.small, blockChanges: best.blockChanges, missingWalk: best.missingWalk, timings },
   }
 }

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { rankTeachers, suggestAssignments, teacherLoads } from '../assigner'
+import { SHARE_PENALTY, rankTeachers, sectionCounts, suggestAssignments, teacherLoads } from '../assigner'
 import { TERMS } from '../generator'
 import { useStore } from '../store'
 
@@ -17,7 +17,8 @@ export default function AssignmentTools() {
   const codesWithPrefs = new Set(db.TeacherPreferences.filter((p) => p._status === 'approved').map((p) => p.SubjectCode))
   const subjectChoices = [...new Map(approvedSubjects.filter((s) => codesWithPrefs.has(s.SubjectCode)).map((s) => [s.SubjectCode, s])).values()].sort((a, b) => a.SubjectCode.localeCompare(b.SubjectCode))
   const code = subjectChoices.some((s) => s.SubjectCode === subject) ? subject : subjectChoices[0]?.SubjectCode
-  const ranked = code ? rankTeachers(db, code, loads) : []
+  const counts = useMemo(() => sectionCounts(db), [db])
+  const ranked = code ? rankTeachers(db, code, loads, counts) : []
 
   const openAuto = () => setAuto({ scope: { term: 'all', branch: '' }, fallback: false, result: null })
   const preview = () => setAuto((a) => ({ ...a, result: suggestAssignments({ db, scope: a.scope, fallback: a.fallback }) }))
@@ -43,7 +44,7 @@ export default function AssignmentTools() {
         <div className="tools-head">
           <div>
             <h3>Teacher priority order</h3>
-            <p className="muted">Who asked to teach a subject, best claim first: their priority, then experience and published papers (entered in Teacher Preferences), then the lighter load.</p>
+            <p className="muted">Who asked to teach a subject, best claim first: their priority, then a fit score out of 100 (experience, times taught, papers, same branch) minus {SHARE_PENALTY} for each section of it they already have, then the lighter share of their max load.</p>
           </div>
           {isAdmin && <button className="btn primary" onClick={openAuto}>✨ Auto-assign by preference</button>}
         </div>
@@ -59,7 +60,7 @@ export default function AssignmentTools() {
             </label>
             <div className="grid-scroll">
               <table className="grid">
-                <thead><tr><th>#</th><th>Teacher</th><th>Type</th><th className="num">Priority</th><th className="num">Experience (yrs)</th><th className="num">Papers</th><th className="num">Load</th></tr></thead>
+                <thead><tr><th>#</th><th>Teacher</th><th>Type</th><th className="num">Priority</th><th className="num">Fit</th><th className="num">Sections held</th><th className="num">Experience (yrs)</th><th className="num">Taught</th><th className="num">Papers</th><th className="num">Load</th></tr></thead>
                 <tbody>
                   {ranked.map((c, i) => (
                     <tr key={c.teacher._id}>
@@ -67,7 +68,10 @@ export default function AssignmentTools() {
                       <td>{c.teacher.TeacherID} — {c.teacher.Name}</td>
                       <td>{c.teacher.TeacherType ?? '—'}</td>
                       <td className="num">{c.priority === 9 ? '—' : c.priority}</td>
+                      <td className="num">{c.fit}</td>
+                      <td className="num">{c.held}</td>
                       <td className="num">{c.years}</td>
+                      <td className="num">{c.taught}</td>
                       <td className="num">{c.papers}</td>
                       <td className="num">{c.load}/{c.max}h</td>
                     </tr>
@@ -107,13 +111,13 @@ export default function AssignmentTools() {
                 {r.assignments.length > 0 && (
                   <div className="grid-scroll short">
                     <table className="grid">
-                      <thead><tr><th>Section</th><th>Subject</th><th>Teacher</th><th className="num">Priority</th><th className="num">Yrs</th><th className="num">Papers</th></tr></thead>
+                      <thead><tr><th>Section</th><th>Subject</th><th>Teacher</th><th className="num">Priority</th><th className="num">Fit</th><th className="num">Yrs</th><th className="num">Taught</th><th className="num">Papers</th></tr></thead>
                       <tbody>
                         {r.assignments.slice(0, 300).map((a) => (
                           <tr key={`${a.SectionID}|${a.SubjectCode}`}>
                             <td>{a.SectionID}</td><td>{a.SubjectName} <span className="sub">{a.SubjectCode}</span></td>
                             <td>{a.TeacherID} — {a.TeacherName}{a.note && <span className="sub"> ({a.note})</span>}</td>
-                            <td className="num">{a.priority ?? '—'}</td><td className="num">{a.years}</td><td className="num">{a.papers}</td>
+                            <td className="num">{a.priority ?? '—'}</td><td className="num">{a.fit ?? '—'}</td><td className="num">{a.years}</td><td className="num">{a.taught}</td><td className="num">{a.papers}</td>
                           </tr>
                         ))}
                       </tbody>

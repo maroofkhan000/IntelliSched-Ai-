@@ -90,7 +90,10 @@ export default function Timetable() {
             <div className="tile"><strong>{timetable.stats.sections}</strong><span>sections</span></div>
             <div className="tile"><strong>{new Set(timetable.entries.map((e) => e.TeacherID)).size}</strong><span>teachers used</span></div>
           </div>
-          <p className="muted gen-meta">Generated {new Date(timetable.generatedAt).toLocaleString()} · {TERMS[timetable.scope.term]}{timetable.scope.branch ? ` · ${timetable.scope.branch}` : ''}{timetable.stats.undersizedLabs ? ` · ${timetable.stats.undersizedLabs} lab session(s) use a lab smaller than the section (batches assumed)` : ''}</p>
+          <p className="muted gen-meta">Generated {new Date(timetable.generatedAt).toLocaleString()} · {TERMS[timetable.scope.term]}{timetable.scope.branch ? ` · ${timetable.scope.branch}` : ''}{timetable.stats.undersizedLabs ? ` · ${timetable.stats.undersizedLabs} lab session(s) use a lab smaller than the section (batches assumed)` : ''}{timetable.stats.blockChanges ? ` · ${timetable.stats.blockChanges} building change(s) for teachers across the week` : ''}</p>
+          {timetable.stats.missingWalk?.length > 0 && (
+            <p className="notice">🚶 No travel time entered for {timetable.stats.missingWalk.join(', ')}, so those moves were treated as 0 minutes. Add them under Travel Between Buildings and generate again.</p>
+          )}
 
           <section className="card">
             <div className="view-bar">

@@ -49,6 +49,8 @@ export default function Overview() {
     { ok: h.tooBig.length === 0, label: 'Every section fits in the largest classroom', detail: h.tooBig.length ? `${h.tooBig.length} sections larger than ${h.maxClass} seats` : 'All fit.' },
     { ok: !h.hasLab || h.labRooms > 0, label: 'Lab rooms exist for lab subjects', detail: h.hasLab && !h.labRooms ? 'Lab subjects exist but no Lab room is defined.' : 'OK.' },
     { ok: h.demand <= h.supply || h.supply === 0, warn: true, label: 'Room-hours cover weekly demand', detail: `Demand ${h.demand} session-hours vs. supply ${h.supply} room-hours (${h.supply ? (h.demand / h.supply).toFixed(2) : '–'}×). ${h.demand > h.supply ? 'Scope the term (e.g. odd or even semesters only) before generating.' : ''}` },
+    { ok: h.unknownBlocks.length === 0, warn: true, label: 'Every room is in a listed building', detail: !h.blocks.length ? 'No buildings listed yet: walking time between blocks is not checked.' : h.unknownBlocks.length ? `Rooms use block(s) ${h.unknownBlocks.join(', ')} that are not in Buildings.` : 'All rooms are in listed buildings.' },
+    { ok: h.missingWalk.length === 0, warn: true, label: 'Walking time entered between every pair of buildings', detail: h.missingWalk.length ? `Missing: ${h.missingWalk.slice(0, 6).join(', ')}${h.missingWalk.length > 6 ? ` and ${h.missingWalk.length - 6} more` : ''}. Missing pairs count as 0 minutes.` : h.blocks.length > 1 ? 'All pairs entered.' : 'Only one building (or none): nothing to walk between.' },
     { ok: h.noPrefs.length === 0, warn: true, label: 'Teachers have submitted subject priorities', detail: h.noPrefs.length ? `${h.noPrefs.length} teachers have no preferences yet.` : 'All teachers have preferences.' },
   ]
 
