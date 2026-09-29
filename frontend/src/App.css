@@ -138,8 +138,6 @@ p.errors { padding-left: 0; }
 .login-hero p { color: var(--muted); font-size: 17px; line-height: 1.5; max-width: 46ch; margin: 0; }
 .login-card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 30px; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 8px 0 var(--card-edge), 0 34px 50px -22px var(--drop); }
 .login-card h2 { font-size: 24px; font-weight: 700; }
-.demo { border-top: 1px solid var(--line); padding-top: 14px; display: grid; gap: 10px; }
-.demo p { margin: 0; font-size: 13px; color: var(--muted); }
 
 .stage { --px: 0; --py: 0; height: 400px; margin-top: 8px; perspective: 1400px; display: grid; place-items: center; }
 .scene { position: relative; width: 300px; height: 190px; transform-style: preserve-3d; transform: rotateX(calc(58deg + var(--py) * 10deg)) rotateZ(calc(-38deg + var(--px) * 26deg)) translateZ(-60px); transition: transform .25s ease-out; }
@@ -266,5 +264,5 @@ details { margin-top: 12px; font-size: 13.5px; }
 /* ---------- preferences inside the teacher form ---------- */
 .prefs { margin-top: 22px; padding-top: 4px; border-top: 1px solid var(--line); }
 .prefs .sub-h .sub { font-weight: 400; }
-.pref-row { display: grid; grid-template-columns: minmax(0, 2.4fr) minmax(0, .8fr) minmax(0, 1fr) minmax(0, 1fr) auto; gap: 12px; align-items: end; margin-bottom: 10px; }
+.pref-row { display: grid; grid-template-columns: minmax(0, 2.4fr) minmax(0, .8fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) auto; gap: 12px; align-items: end; margin-bottom: 10px; }
 @media (max-width: 800px) { .pref-row { grid-template-columns: 1fr 1fr; } }

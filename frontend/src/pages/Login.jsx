@@ -21,7 +21,6 @@ export default function Login() {
     e.preventDefault()
     attempt(u, p)
   }
-  const quick = (name) => attempt(name, name === 'admin' ? 'admin123' : 'feeder123')
 
   return (
     <div className="login-page">
@@ -38,11 +37,6 @@ export default function Login() {
         <label className="field"><span>Password</span><input type="password" value={p} onChange={(e) => setP(e.target.value)} autoComplete="current-password" /></label>
         {err && <p className="errors" role="alert">{err}</p>}
         <button className="btn primary wide" type="submit" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
-        <div className="demo">
-          <p>Try a demo account</p>
-          <button type="button" className="btn" onClick={() => quick('admin')}>Admin <small>admin / admin123</small></button>
-          <button type="button" className="btn" onClick={() => quick('feeder')}>Feeder <small>feeder / feeder123</small></button>
-        </div>
       </form>
     </div>
   )

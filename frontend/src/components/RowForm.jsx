@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import branchCatalog from '../branchCatalog.json'
 import catalog from '../subjectCatalog.json'
 import { rankTeachers, teacherLoads } from '../assigner'
-import { TABLES, validateRow, withDerived } from '../schema'
+import { MAX_TOP_PRIORITY, TABLES, topPriorityError, validateRow, withDerived } from '../schema'
 import { useStore } from '../store'
 
 // Modal form for adding / editing one row of a table.
@@ -32,11 +32,12 @@ export default function RowForm({ table, row, onClose }) {
   const isTeachers = table === 'Teachers'
   // a teacher's subject preferences are edited right inside the teacher form
   const [prefs, setPrefs] = useState(() => (isTeachers && row
-    ? db.TeacherPreferences.filter((p) => p.TeacherID === row.TeacherID).map((p) => ({ SubjectCode: p.SubjectCode, Priority: p.Priority, ExperienceYears: p.ExperienceYears ?? '', ResearchPapers: p.ResearchPapers ?? '' }))
+    ? db.TeacherPreferences.filter((p) => p.TeacherID === row.TeacherID).map((p) => ({ SubjectCode: p.SubjectCode, Priority: p.Priority, ExperienceYears: p.ExperienceYears ?? '', TimesTaught: p.TimesTaught ?? '', ResearchPapers: p.ResearchPapers ?? '' }))
     : []))
   const setPref = (i, patch) => setPrefs((l) => l.map((p, j) => (j === i ? { ...p, ...patch } : p)))
   const isRooms = table === 'Rooms'
-  const BLOCKS = ['A', 'B', 'C', 'D', 'E', 'F']
+  // blocks come from the Buildings table once it has rows; until then, the usual A–F
+  const BLOCKS = db.Buildings.length ? [...new Set(db.Buildings.map((b) => b.BuildingCode))].sort() : ['A', 'B', 'C', 'D', 'E', 'F']
   const [otherBlock, setOtherBlock] = useState(() => isRooms && editing && Boolean(row.Building) && !BLOCKS.includes(row.Building))
   const [otherRoomNo, setOtherRoomNo] = useState(() => isRooms && editing && Number(row.RoomNo) > 20)
   const [otherBranch, setOtherBranch] = useState(() => isBranches && editing && !branchCatalog.some((x) => x.BranchCode === row.BranchCode))
@@ -53,6 +54,7 @@ export default function RowForm({ table, row, onClose }) {
     const data = { ...preview }
     for (const c of t.columns) if ((c.type === 'number' || c.numeric) && data[c.key] !== '' && data[c.key] != null) data[c.key] = Number(data[c.key])
     const errs = validateRow(table, data, db, row?._id)
+    if (isTeachers && topPriorityError(prefs)) errs.push(topPriorityError(prefs))
     setErrors(errs)
     if (errs.length) return
     setBusy(true)
@@ -111,7 +113,7 @@ export default function RowForm({ table, row, onClose }) {
   const ROOM_ORDER = ['Building', 'Floor', 'RoomNo', 'RoomID']
   const isAssign = table === 'TeacherSubjectMap'
   const ASSIGN_ORDER = ['SectionID', 'SubjectCode', 'TeacherID']
-  // teachers who asked for the chosen subject, best claim first (priority, experience, papers, load)
+  // teachers who asked for the chosen subject, best claim first (priority, fit score, load share)
   const ranked = useMemo(() => (isAssign && form.SubjectCode ? rankTeachers(db, form.SubjectCode, teacherLoads(db)) : []), [isAssign, form.SubjectCode, db])
   const formColumns = isAssign
     ? [...ASSIGN_ORDER.map((k) => t.columns.find((c) => c.key === k)), ...t.columns.filter((c) => !ASSIGN_ORDER.includes(c.key))]
@@ -196,7 +198,7 @@ export default function RowForm({ table, row, onClose }) {
                       <optgroup label="Asked for this subject — best claim first">
                         {ranked.map((r, i) => (
                           <option key={r.teacher._id} value={r.teacher.TeacherID}>
-                            {i + 1}. {r.teacher.TeacherID} — {r.teacher.Name} · priority {r.priority === 9 ? '–' : r.priority} · {r.years} yrs · {r.papers} papers · load {r.load}/{r.max}h
+                            {i + 1}. {r.teacher.TeacherID} — {r.teacher.Name} · priority {r.priority === 9 ? '–' : r.priority} · fit {r.fit} · {r.years} yrs · taught {r.taught}× · {r.papers} papers · load {r.load}/{r.max}h
                           </option>
                         ))}
                       </optgroup>
@@ -323,7 +325,7 @@ export default function RowForm({ table, row, onClose }) {
 
         {isTeachers && (
           <div className="prefs">
-            <h4 className="sub-h">Subject preferences <span className="sub">— subjects this teacher wants to teach, ranked (1 = most wanted)</span></h4>
+            <h4 className="sub-h">Subject preferences <span className="sub">— subjects this teacher wants to teach, ranked (1 = most wanted, at most {MAX_TOP_PRIORITY} subjects at priority 1)</span></h4>
             {prefs.map((p, i) => {
               const chosen = new Set(prefs.filter((_, j) => j !== i).map((x) => x.SubjectCode))
               const choices = [...new Map(db.Subjects.filter((s) => (!form.BranchCode || s.BranchCode === form.BranchCode) && !chosen.has(s.SubjectCode)).map((s) => [s.SubjectCode, s])).values()].sort((a, b) => a.SubjectCode.localeCompare(b.SubjectCode))
@@ -343,12 +345,13 @@ export default function RowForm({ table, row, onClose }) {
                     </select>
                   </label>
                   <label className="field"><span>Experience (yrs)</span><input type="number" min={0} max={60} value={p.ExperienceYears} onChange={(e) => setPref(i, { ExperienceYears: e.target.value })} /></label>
+                  <label className="field"><span>Times taught</span><input type="number" min={0} max={100} value={p.TimesTaught} onChange={(e) => setPref(i, { TimesTaught: e.target.value })} /></label>
                   <label className="field"><span>Research papers</span><input type="number" min={0} max={1000} value={p.ResearchPapers} onChange={(e) => setPref(i, { ResearchPapers: e.target.value })} /></label>
                   <button type="button" className="link danger" onClick={() => setPrefs((l) => l.filter((_, j) => j !== i))}>Remove</button>
                 </div>
               )
             })}
-            <button type="button" className="btn sm" onClick={() => setPrefs((l) => [...l, { SubjectCode: '', Priority: '', ExperienceYears: '', ResearchPapers: '' }])}>+ Add subject preference</button>
+            <button type="button" className="btn sm" onClick={() => setPrefs((l) => [...l, { SubjectCode: '', Priority: '', ExperienceYears: '', TimesTaught: '', ResearchPapers: '' }])}>+ Add subject preference</button>
             {!form.BranchCode && <p className="sub">Pick the teacher's branch first to see its subjects.</p>}
           </div>
         )}

@@ -10,7 +10,7 @@ export const WEEK = ['Sunday', ...DAYS]
 // nothing is preselected, the admin or feeder chooses everything.
 export const defaultSettings = () => ({ schoolDays: [], periodsPerDay: 0, timingMode: 'manual', timings: {}, auto: { start: '', duration: '', breaks: [] }, avail: {} })
 
-const toMin = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m }
+export const toMin = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m }
 const toHHMM = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
 
 // Automatic timings: periods of `duration` minutes from `start`, with a break of
@@ -42,6 +42,9 @@ export function nextTeacherId(teachers, type) {
   const max = teachers.reduce((m, t) => Math.max(m, Number(re.exec(String(t.TeacherID))?.[1] ?? 0)), 0)
   return `${prefix}${String(max + 1).padStart(4, '0')}`
 }
+
+// Each teacher may mark at most this many subjects as priority 1, so priority stays meaningful.
+export const MAX_TOP_PRIORITY = 2
 
 // Column kinds: text | number | select | ref (dropdown from another table's key)
 export const TABLES = {
@@ -115,6 +118,10 @@ export const TABLES = {
       { key: 'BranchCode', label: 'Branch', type: 'ref', ref: 'Branches', refKey: 'BranchCode', required: true },
       { key: 'Designation', label: 'Designation', type: 'select', options: ['Professor', 'Associate Professor', 'Assistant Professor', 'Lecturer', 'Visiting Faculty'], required: true },
       { key: 'MaxWeeklyLoad', label: 'Max Weekly Load (hrs)', type: 'number', min: 1, max: 40, required: true },
+      // moving between buildings (all optional; blank = no restriction)
+      { key: 'HomeBuilding', label: 'Home Building', type: 'ref', ref: 'Buildings', refKey: 'BuildingCode', refLabel: 'BuildingName' },
+      { key: 'MaxBuildingChanges', label: 'Max building changes / day', type: 'number', min: 0, max: 10 },
+      { key: 'ExtraTravelMinutes', label: 'Extra travel time (min)', type: 'number', min: 0, max: 60 },
     ],
     defaults: { Designation: 'Assistant Professor', MaxWeeklyLoad: 18 },
     // a new teacher gets the next free ID for their type; existing IDs never change
@@ -124,7 +131,7 @@ export const TABLES = {
   TeacherPreferences: {
     label: 'Teacher Preferences',
     icon: '⭐',
-    hint: 'Which subjects each teacher wants to teach, ranked by priority (1 = most wanted), with their experience and published papers in that area. Auto-assign uses all of these.',
+    hint: `Which subjects each teacher wants to teach, ranked by priority (1 = most wanted, at most ${MAX_TOP_PRIORITY} per teacher), with their experience, how often they taught it and published papers in that area. Auto-assign uses all of these.`,
     key: ['TeacherID', 'SubjectCode'],
     filterBy: 'TeacherID',
     columns: [
@@ -132,10 +139,26 @@ export const TABLES = {
       { key: 'SubjectCode', label: 'Subject', type: 'ref', ref: 'Subjects', refKey: 'SubjectCode', refLabel: 'SubjectName', required: true },
       { key: 'Priority', label: 'Priority (1 = highest)', type: 'select', options: [1, 2, 3, 4, 5], numeric: true, required: true },
       { key: 'ExperienceYears', label: 'Experience (years)', type: 'number', min: 0, max: 60 },
+      { key: 'TimesTaught', label: 'Times taught before', type: 'number', min: 0, max: 100 },
       { key: 'ResearchPapers', label: 'Published research papers', type: 'number', min: 0, max: 1000 },
       { key: 'Remarks', label: 'Remarks' },
     ],
     defaults: { Priority: 1 },
+  },
+
+  TeacherAvailability: {
+    label: 'Teacher Unavailability',
+    icon: '🚫',
+    hint: 'Times a teacher cannot teach (leave, admin or exam duty, another campus). Leave Period blank to block the whole day. The timetable never uses these slots.',
+    key: ['TeacherID', 'Day', 'Period'],
+    filterBy: 'TeacherID',
+    columns: [
+      { key: 'TeacherID', label: 'Teacher', type: 'ref', ref: 'Teachers', refKey: 'TeacherID', refLabel: 'Name', required: true },
+      { key: 'Day', label: 'Day', type: 'select', options: WEEK, required: true },
+      { key: 'Period', label: 'Period (blank = whole day)', type: 'number', min: 1, max: 12 },
+      { key: 'Reason', label: 'Reason', type: 'select', options: ['Leave', 'Admin duty', 'Exam duty', 'Other campus', 'Other'] },
+    ],
+    defaults: { Day: 'Monday', Reason: 'Leave' },
   },
 
   TeacherSubjectMap: {
@@ -158,6 +181,35 @@ export const TABLES = {
       const s = (db.Sections || []).find((x) => x.SectionID === r.SectionID)
       return s ? { BranchCode: s.BranchCode, Year: s.Year, Semester: s.Semester, Section: s.Section } : {}
     },
+  },
+
+  Buildings: {
+    label: 'Buildings',
+    icon: '🏢',
+    hint: 'Blocks on campus. The code is the block letter used in Room IDs (A101 is in block A).',
+    key: ['BuildingCode'],
+    adminOnly: true,
+    columns: [
+      { key: 'BuildingCode', label: 'Block Code', required: true, upper: true },
+      { key: 'BuildingName', label: 'Building Name', required: true },
+      { key: 'Campus', label: 'Campus' },
+      { key: 'HasLift', label: 'Has Lift', type: 'select', options: ['Yes', 'No'] },
+    ],
+    defaults: { Campus: 'Main', HasLift: 'No' },
+  },
+
+  BuildingTravel: {
+    label: 'Travel Between Buildings',
+    icon: '🚶',
+    hint: 'Walking minutes between two blocks (one row covers both directions). A teacher only gets back-to-back classes in different blocks if the gap between them covers this time.',
+    key: ['FromBuilding', 'ToBuilding'],
+    adminOnly: true,
+    columns: [
+      { key: 'FromBuilding', label: 'From', type: 'ref', ref: 'Buildings', refKey: 'BuildingCode', refLabel: 'BuildingName', required: true },
+      { key: 'ToBuilding', label: 'To', type: 'ref', ref: 'Buildings', refKey: 'BuildingCode', refLabel: 'BuildingName', required: true },
+      { key: 'WalkMinutes', label: 'Walk (minutes)', type: 'number', min: 0, max: 120, required: true },
+    ],
+    defaults: { WalkMinutes: 5 },
   },
 
   Rooms: {
@@ -198,7 +250,7 @@ export const TABLES = {
   },
 }
 
-export const TABLE_ORDER = ['Branches', 'Sections', 'Subjects', 'Teachers', 'TeacherPreferences', 'TeacherSubjectMap', 'Rooms', 'TimeSlots']
+export const TABLE_ORDER = ['Branches', 'Sections', 'Subjects', 'Teachers', 'TeacherPreferences', 'TeacherAvailability', 'TeacherSubjectMap', 'Buildings', 'BuildingTravel', 'Rooms', 'TimeSlots']
 
 export const recordKey = (name, row) => TABLES[name].key.map((k) => String(row[k] ?? '')).join('|')
 
@@ -231,6 +283,10 @@ export function validateRow(name, row, db, selfId) {
   if (name === 'TimeSlots' && row.StartTime && row.EndTime && row.StartTime >= row.EndTime) errs.push('End time must be after start time')
   if (name === 'Rooms' && !row.RoomID) errs.push('Pick a block, floor and room number to generate the Room ID')
   if (name === 'Subjects' && row.Type === 'Lab' && Number(row.WeeklyHours) % 2 === 1) errs.push('Lab hours should be even (labs run as 2-period blocks)')
+  if (name === 'BuildingTravel' && row.FromBuilding && row.FromBuilding === row.ToBuilding) errs.push('From and To must be different blocks (the same block is always 0 minutes)')
+  if (name === 'BuildingTravel' && (db.BuildingTravel || []).some((r) => r._id !== selfId && r.FromBuilding === row.ToBuilding && r.ToBuilding === row.FromBuilding)) {
+    errs.push(`Travel time between ${row.FromBuilding} and ${row.ToBuilding} is already entered (one row covers both directions)`)
+  }
   const k = recordKey(name, row)
   if (!errs.length && (db[name] || []).some((r) => r._id !== selfId && recordKey(name, r) === k)) {
     errs.push(`Duplicate: ${t.key.join(' + ')} "${k.replaceAll('|', ' / ')}" already exists`)
@@ -246,4 +302,10 @@ export function breakAfter(s, p) {
   if (!end || !minutes || p >= s.periodsPerDay) return null
   const e = toMin(end) + minutes
   return e > 24 * 60 ? null : { start: end, end: toHHMM(e), minutes }
+}
+
+// A teacher's preference list may hold at most MAX_TOP_PRIORITY priority-1 subjects.
+export function topPriorityError(prefs) {
+  const n = prefs.filter((p) => Number(p.Priority) === 1).length
+  return n > MAX_TOP_PRIORITY ? `At most ${MAX_TOP_PRIORITY} subjects can be priority 1 (this teacher has ${n}); rank the rest 2 or lower` : ''
 }
