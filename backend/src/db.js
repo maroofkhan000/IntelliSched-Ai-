@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs'
 import { randomUUID } from 'node:crypto'
 import { MongoClient } from 'mongodb'
-import { TABLE_ORDER, defaultSettings } from '../../frontend/src/schema.js'
+import { TABLE_ORDER, defaultSettings } from './schema.js'
 
 let client
 export let users, databases, rows

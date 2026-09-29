@@ -4,10 +4,10 @@ import cors from 'cors'
 import express from 'express'
 import jwt from 'jsonwebtoken'
 import { randomUUID } from 'node:crypto'
-import { TABLES, TABLE_ORDER, defaultSettings, recordKey, validateRow, withDerived } from '../../frontend/src/schema.js'
+import { TABLES, TABLE_ORDER, defaultSettings, recordKey, validateRow, withDerived } from './schema.js'
 import * as store from './db.js'
 
-for (const k of ['MONGODB_URI', 'JWT_SECRET']) if (!process.env[k]) throw new Error(`Missing ${k} in backend/.env`)
+for (const k of ['MONGODB_URI', 'JWT_SECRET']) if (!process.env[k]) throw new Error(`Missing ${k} (set it in backend/.env locally, or in Vercel's environment variables)`)
 
 const app = express()
 app.use(cors({ origin: (process.env.CORS_ORIGIN || '').split(',').map((s) => s.trim()).filter(Boolean) }))
@@ -256,5 +256,11 @@ app.use((err, _req, res, _next) => {
 })
 
 await store.connect()
-const port = Number(process.env.PORT) || 4000
-app.listen(port, () => console.log(`IntelliSched API on http://localhost:${port}`))
+
+// On Vercel the exported app runs as a function; locally we listen on a port.
+if (!process.env.VERCEL) {
+  const port = Number(process.env.PORT) || 4000
+  app.listen(port, () => console.log(`IntelliSched API on http://localhost:${port}`))
+}
+
+export default app
