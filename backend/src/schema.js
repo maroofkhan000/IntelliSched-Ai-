@@ -51,13 +51,13 @@ export const TABLES = {
   Branches: {
     label: 'Branches',
     icon: '🏛️',
-    hint: 'Departments / programmes offered',
+    hint: 'Programmes offered',
     key: ['BranchCode'],
     adminOnly: true,
     columns: [
+      { key: 'Degree', label: 'Degree', type: 'select', options: ['B.Tech', 'M.Tech', 'BCA', 'MCA', 'MBA'], required: true },
       { key: 'BranchCode', label: 'Branch Code', required: true, upper: true },
       { key: 'BranchName', label: 'Branch Name', required: true },
-      { key: 'Degree', label: 'Degree', type: 'select', options: ['B.Tech', 'M.Tech', 'BCA', 'MCA', 'MBA'], required: true },
       { key: 'TotalYears', label: 'Total Years', type: 'number', min: 1, max: 6, required: true },
       { key: 'SemestersPerYear', label: 'Sem / Year', type: 'number', min: 1, max: 4, required: true },
     ],

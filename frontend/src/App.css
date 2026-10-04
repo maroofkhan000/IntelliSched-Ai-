@@ -113,8 +113,9 @@ p.errors { padding-left: 0; }
 .modal header, .modal footer { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .modal header h3 { font-size: 20px; font-weight: 700; }
 .modal footer { justify-content: flex-end; margin-top: 22px; padding-bottom: 4px; }
-.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 18px; }
-.field { display: flex; flex-direction: column; gap: 5px; font-size: 13px; }
+.fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; margin-top: 18px; }
+.field { display: flex; flex-direction: column; gap: 5px; font-size: 13px; min-width: 0; }
+.field select { width: 100%; text-overflow: ellipsis; }
 .field > span { color: var(--muted); font-weight: 500; }
 .field span b { color: var(--bad); }
 .field em { font-style: normal; font-size: 11px; background: var(--brand-soft); padding: 0 6px; border-radius: 8px; margin-left: 4px; }

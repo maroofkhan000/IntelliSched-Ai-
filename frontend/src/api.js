@@ -21,6 +21,6 @@ export async function api(path, { method = 'GET', body } = {}) {
     throw Object.assign(new Error('Cannot reach the server. Is the backend running?'), { network: true })
   }
   const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw Object.assign(new Error(data.error || `Request failed (${res.status})`), { status: res.status, errors: data.errors })
+  if (!res.ok) throw Object.assign(new Error(data.error || `Request failed (${res.status})`), { status: res.status, errors: data.errors, needsPassword: data.needsPassword })
   return data
 }

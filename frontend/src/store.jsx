@@ -25,6 +25,7 @@ export function StoreProvider({ children }) {
   const [notice, setNotice] = useState('') // last failed action, shown as a banner
   const [databases, setDatabases] = useState([])
   const [active, setActive] = useState(null) // { id, name, createdAt, settings, data }
+  const [pwAsk, setPwAsk] = useState(null) // { message, resolve } while the admin-password dialog is open
 
   const settingsTimer = useRef(null)
   const pendingSettings = useRef(null)
@@ -34,8 +35,24 @@ export function StoreProvider({ children }) {
       return await fn()
     } catch (e) {
       if (e.status === 401) { setToken(null); setUser(null); setActive(null) }
-      else setNotice(e.message)
+      else if (!e.cancelled) setNotice(e.message)
       throw e
+    }
+  }, [])
+
+  // Big deletes need an admin's password. The server says when; we ask for it and retry
+  // until it is accepted or the dialog is cancelled.
+  const answerPassword = useCallback((v) => setPwAsk((p) => { p?.resolve(v); return null }), [])
+  const withAdminPassword = useCallback(async (send) => {
+    let adminPassword
+    for (;;) {
+      try {
+        return await send(adminPassword)
+      } catch (e) {
+        if (!e.needsPassword) throw e
+        adminPassword = await new Promise((resolve) => setPwAsk({ message: e.message, resolve }))
+        if (adminPassword == null) throw Object.assign(new Error('Cancelled.'), { cancelled: true })
+      }
     }
   }, [])
 
@@ -84,7 +101,7 @@ export function StoreProvider({ children }) {
       await boot()
       return true
     } catch (e) {
-      if (e.network) setNotice(e.message)
+      if (e.network || e.status === 429) setNotice(e.message)
       return false
     }
   }, [boot])
@@ -122,10 +139,10 @@ export function StoreProvider({ children }) {
   }), [guard, refreshList])
 
   const deleteDatabase = useCallback((id) => guard(async () => {
-    await api(`/databases/${id}`, { method: 'DELETE' })
+    await withAdminPassword((adminPassword) => api(`/databases/${id}`, { method: 'DELETE', body: { adminPassword } }))
     const list = await refreshList()
     if (active?.id === id) await loadDatabase(list[0].id)
-  }), [guard, refreshList, loadDatabase, active])
+  }).catch(() => {}), [guard, withAdminPassword, refreshList, loadDatabase, active])
 
   // ---------- rows ----------
   const patchTable = (table, fn) => setActive((a) => ({ ...a, data: { ...a.data, [table]: fn(a.data[table] ?? []) } }))
@@ -166,24 +183,24 @@ export function StoreProvider({ children }) {
   }, [active?.id, guard, refreshList])
 
   const deleteRows = useCallback((table, ids) => guard(async () => {
-    await api(`/databases/${active.id}/tables/${table}/rows/delete`, { method: 'POST', body: { ids } })
+    await withAdminPassword((adminPassword) => api(`/databases/${active.id}/tables/${table}/rows/delete`, { method: 'POST', body: { ids, adminPassword } }))
     const gone = new Set(ids)
     setActive((a) => {
       const tids = table === 'Teachers' ? new Set(a.data.Teachers.filter((r) => gone.has(r._id)).map((r) => r.TeacherID)) : null
       return { ...a, data: { ...a.data, [table]: a.data[table].filter((r) => !gone.has(r._id)), ...(tids ? { TeacherPreferences: a.data.TeacherPreferences.filter((p) => !tids.has(p.TeacherID)) } : {}) } }
     })
     refreshList()
-  }).catch(() => {}), [guard, active?.id, refreshList])
+  }).catch(() => {}), [guard, withAdminPassword, active?.id, refreshList])
 
   const setStatus = useCallback((table, ids, status) => guard(async () => {
-    await api(`/databases/${active.id}/tables/${table}/status`, { method: 'POST', body: { ids, status } })
+    await withAdminPassword((adminPassword) => api(`/databases/${active.id}/tables/${table}/status`, { method: 'POST', body: { ids, status, adminPassword } }))
     const set = new Set(ids)
     const apply = (rows, hit) => (status === 'rejected' ? rows.filter((r) => !hit(r)) : rows.map((r) => (hit(r) ? { ...r, _status: status } : r)))
     setActive((a) => {
       const tids = table === 'Teachers' ? new Set(a.data.Teachers.filter((r) => set.has(r._id)).map((r) => r.TeacherID)) : null
       return { ...a, data: { ...a.data, [table]: apply(a.data[table], (r) => set.has(r._id)), ...(tids ? { TeacherPreferences: apply(a.data.TeacherPreferences, (p) => tids.has(p.TeacherID)) } : {}) } }
     })
-  }).catch(() => {}), [guard, active?.id])
+  }).catch(() => {}), [guard, withAdminPassword, active?.id])
 
   // Merge rows (e.g. from an Excel file). Rows with the same key are replaced.
   // Rejects on failure so callers can show the message.
@@ -194,10 +211,10 @@ export function StoreProvider({ children }) {
   }), [guard, active?.id, refreshList])
 
   const clearAll = useCallback(() => guard(async () => {
-    await api(`/databases/${active.id}/rows`, { method: 'DELETE' })
+    await withAdminPassword((adminPassword) => api(`/databases/${active.id}/rows`, { method: 'DELETE', body: { adminPassword } }))
     setActive((a) => ({ ...a, data: emptyDb() }))
     refreshList()
-  }).catch(() => {}), [guard, active?.id, refreshList])
+  }).catch(() => {}), [guard, withAdminPassword, active?.id, refreshList])
 
   // ---------- timetable ----------
   // Builds a timetable from the current database + General Settings and saves it.
@@ -262,6 +279,6 @@ export function StoreProvider({ children }) {
   const canEditTable = (table) => isAdmin || !TABLES[table].adminOnly
   const canDeleteRow = (table, row) => isAdmin || (canEditTable(table) && row._status === 'pending' && row._by === user?.username)
 
-  const value = { saveTeacher, db, settings, timetable: active?.timetable ?? null, generateTimetable, clearTimetable, saveSettings, applyTimeSlots, databases, activeDb, createDatabase, switchDatabase, renameDatabase, deleteDatabase, user, isAdmin, login, logout, saveRow, deleteRows, setStatus, importRows, clearAll, pendingCount, canEditTable, canDeleteRow, booting, bootError, retry: boot, notice, clearNotice: () => setNotice('') }
+  const value = { saveTeacher, db, settings, timetable: active?.timetable ?? null, generateTimetable, clearTimetable, saveSettings, applyTimeSlots, databases, activeDb, createDatabase, switchDatabase, renameDatabase, deleteDatabase, user, isAdmin, login, logout, saveRow, deleteRows, setStatus, importRows, clearAll, pendingCount, canEditTable, canDeleteRow, booting, bootError, retry: boot, pwAsk, answerPassword, notice, clearNotice: () => setNotice('') }
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

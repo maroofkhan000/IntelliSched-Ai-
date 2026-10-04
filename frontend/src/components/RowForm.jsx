@@ -86,14 +86,25 @@ export default function RowForm({ table, row, onClose }) {
     return { ...f, Year: y, Semester: ok ? f.Semester : '', ...(!ok && !other ? { SubjectCode: '', SubjectName: '' } : {}) }
   })
   const taken = new Set(db.Subjects.filter((r) => r._id !== row?._id && r.BranchCode === form.BranchCode).map((r) => r.SubjectCode))
-  const catalogOptions = isSubjects && form.BranchCode && form.Semester
-    ? subjectPool.filter((s) => (s.BranchCode === form.BranchCode || s.BranchCode === 'ALL') && Number(s.Semester) === Number(form.Semester) && !taken.has(s.SubjectCode))
+  // Branch + Year is enough to list subjects: the year's semesters are offered, grouped, and
+  // picking one fills the semester. A chosen semester narrows the list to just that semester.
+  const pickedYear = Number(preview.Year)
+  const catalogOptions = isSubjects && form.BranchCode && (form.Semester || pickedYear)
+    ? subjectPool.filter((s) => (s.BranchCode === form.BranchCode || s.BranchCode === 'ALL') && !taken.has(s.SubjectCode) &&
+        (form.Semester ? Number(s.Semester) === Number(form.Semester) : Math.ceil(Number(s.Semester) / perYear) === pickedYear))
     : []
+  const catalogGroups = []
+  for (const s of catalogOptions) {
+    const label = `Semester ${s.Semester} · ${s.Elective ? 'Electives' : 'Core'}`
+    const g = catalogGroups.find((x) => x.label === label) ?? catalogGroups[catalogGroups.push({ label, sem: Number(s.Semester), elective: Boolean(s.Elective), items: [] }) - 1]
+    g.items.push(s)
+  }
+  catalogGroups.sort((a, b) => a.sem - b.sem || a.elective - b.elective)
   const pickCatalog = (code) => {
     if (code === OTHER) { setOther(true); setForm((f) => ({ ...f, SubjectCode: '', SubjectName: '' })); return }
     const s = catalogOptions.find((x) => x.SubjectCode === code)
     setForm((f) => (s
-      ? { ...f, SubjectCode: s.SubjectCode, SubjectName: s.SubjectName, Type: s.Type, Credits: s.Credits, WeeklyHours: s.WeeklyHours }
+      ? { ...f, Semester: s.Semester, SubjectCode: s.SubjectCode, SubjectName: s.SubjectName, Type: s.Type, Credits: s.Credits, WeeklyHours: s.WeeklyHours }
       : { ...f, SubjectCode: '', SubjectName: '' }))
   }
 
@@ -171,18 +182,23 @@ export default function RowForm({ table, row, onClose }) {
               )
             }
             if (isSubjects && !other && (c.key === 'SubjectCode' || c.key === 'SubjectName')) {
-              const ready = form.BranchCode && form.Semester
+              const ready = form.BranchCode && (form.Semester || pickedYear)
               const isCode = c.key === 'SubjectCode'
               const picked = form.SubjectCode
               return (
                 <label key={c.key} className="field">
                   <span>{c.label}<b> *</b></span>
                   <select value={picked} disabled={!ready} onChange={(e) => pickCatalog(e.target.value)}>
-                    <option value="">{ready ? 'Select…' : 'Pick branch & semester first'}</option>
+                    <option value="">{!ready ? 'Pick branch & year first' : catalogOptions.length ? 'Select…' : 'All listed subjects added — use Other'}</option>
                     {picked && !catalogOptions.some((s) => s.SubjectCode === picked) && <option value={picked}>{isCode ? picked : form.SubjectName}</option>}
-                    {catalogOptions.map((s) => <option key={s.SubjectCode} value={s.SubjectCode}>{isCode ? s.SubjectCode : s.SubjectName}</option>)}
+                    {catalogGroups.map((g) => (
+                      <optgroup key={g.label} label={g.label}>
+                        {g.items.map((s) => <option key={s.SubjectCode} value={s.SubjectCode}>{isCode ? `${s.SubjectCode} — ${s.SubjectName}` : `${s.SubjectName} (${s.SubjectCode})`}</option>)}
+                      </optgroup>
+                    ))}
                     <option value={OTHER}>Other (enter manually)</option>
                   </select>
+                  {isCode && ready && <small className="sub">{catalogOptions.length} subject{catalogOptions.length === 1 ? '' : 's'} left to add for {form.Semester ? `semester ${form.Semester}` : `year ${pickedYear}`}</small>}
                 </label>
               )
             }

@@ -7,9 +7,13 @@ import { randomUUID } from 'node:crypto'
 import { TABLES, TABLE_ORDER, defaultSettings, recordKey, topPriorityError, validateRow, withDerived } from './schema.js'
 import * as store from './db.js'
 
-for (const k of ['MONGODB_URI', 'JWT_SECRET']) if (!process.env[k]) throw new Error(`Missing ${k} (set it in backend/.env locally, or in Vercel's environment variables)`)
+for (const k of ['MONGODB_URI', 'JWT_SECRET', 'ADMIN_USERNAME', 'ADMIN_PASSWORD', 'FEEDER_USERNAME', 'FEEDER_PASSWORD']) if (!process.env[k]?.trim()) throw new Error(`Missing ${k} (set it in backend/.env locally, or in Vercel's environment variables)`)
+for (const k of ['ADMIN_PASSWORD', 'FEEDER_PASSWORD']) if (process.env[k].length < 10) throw new Error(`${k} must be at least 10 characters`)
+if (process.env.ADMIN_USERNAME.trim().toLowerCase() === process.env.FEEDER_USERNAME.trim().toLowerCase()) throw new Error('ADMIN_USERNAME and FEEDER_USERNAME must be different')
+if (process.env.JWT_SECRET.length < 32) throw new Error('JWT_SECRET must be at least 32 random characters')
 
 const app = express()
+app.set('trust proxy', 1) // so req.ip is the client's address behind Vercel's proxy
 app.use(cors({ origin: (process.env.CORS_ORIGIN || '').split(',').map((s) => s.trim()).filter(Boolean) }))
 app.use(express.json({ limit: '15mb' }))
 
@@ -28,10 +32,44 @@ const auth = (req, res, next) => {
 const adminOnly = (req, res, next) => (req.user.role === 'admin' ? next() : fail(res, 403, 'Admin only.'))
 const publicUser = (u) => ({ username: u.username, role: u.role, name: u.name })
 
+// Deleting more than BULK_LIMIT rows, or a whole table at once, needs an admin's password
+// (sent as `adminPassword`), even when an admin is signed in. Sends the error response itself
+// and returns false when the password is missing, wrong, or locked out after too many tries.
+const BULK_LIMIT = 10
+const adminPasswordOk = async (req, res, count, wholeTable) => {
+  if (count <= BULK_LIMIT && !(wholeTable && count > 1)) return true
+  const password = String(req.body?.adminPassword ?? '')
+  if (!password) {
+    fail(res, 403, `Deleting ${count} rows at once needs the admin password.`, { needsPassword: true })
+    return false
+  }
+  const key = `adminpw:${req.user.username}`
+  if (await store.isLocked(key)) {
+    fail(res, 429, store.LOCK_MESSAGE)
+    return false
+  }
+  for (const a of await store.users.find({ role: 'admin' }).toArray()) {
+    if (await bcrypt.compare(password, a.hash)) {
+      await store.clearFailures(key)
+      return true
+    }
+  }
+  await store.recordFailure(key)
+  fail(res, 403, 'Wrong admin password.', { needsPassword: true })
+  return false
+}
+
 app.post('/api/auth/login', wrap(async (req, res) => {
   const { username = '', password = '' } = req.body ?? {}
-  const u = await store.users.findOne({ username: String(username).trim().toLowerCase() })
-  if (!u || !(await bcrypt.compare(String(password), u.hash))) return fail(res, 401, 'Wrong username or password.')
+  const name = String(username).trim().toLowerCase()
+  const key = `login:${name}:${req.ip}`
+  if (await store.isLocked(key)) return fail(res, 429, store.LOCK_MESSAGE)
+  const u = await store.users.findOne({ username: name })
+  if (!u || !(await bcrypt.compare(String(password), u.hash))) {
+    await store.recordFailure(key)
+    return fail(res, 401, 'Wrong username or password.')
+  }
+  await store.clearFailures(key)
   const user = publicUser(u)
   res.json({ user, token: jwt.sign(user, process.env.JWT_SECRET, { expiresIn: '12h' }) })
 }))
@@ -63,6 +101,7 @@ app.patch('/api/databases/:id', adminOnly, wrap(async (req, res) => {
 
 app.delete('/api/databases/:id', adminOnly, wrap(async (req, res) => {
   if ((await store.databases.countDocuments()) < 2) return fail(res, 400, 'Keep at least one database.')
+  if (!(await adminPasswordOk(req, res, await store.rows.countDocuments({ dbId: req.params.id }), true))) return
   await store.rows.deleteMany({ dbId: req.params.id })
   await store.databases.deleteOne({ _id: req.params.id })
   res.json({ ok: true })
@@ -196,6 +235,9 @@ app.post('/api/databases/:id/tables/:table/rows/delete', withDb, withTable, wrap
   const ids = Array.isArray(req.body?.ids) ? req.body.ids : []
   const filter = { dbId: req.dbDoc._id, table: req.params.table, _id: { $in: ids } }
   if (req.user.role !== 'admin') Object.assign(filter, { _status: 'pending', _by: req.user.username })
+  const count = await store.rows.countDocuments(filter)
+  const whole = count === (await store.rows.countDocuments({ dbId: req.dbDoc._id, table: req.params.table }))
+  if (!(await adminPasswordOk(req, res, count, whole))) return
   const gone = req.params.table === 'Teachers' ? (await store.rows.find(filter).toArray()).map((t) => t.TeacherID) : []
   const r = await store.rows.deleteMany(filter)
   if (gone.length) await store.rows.deleteMany({ dbId: req.dbDoc._id, table: { $in: ['TeacherPreferences', 'TeacherAvailability'] }, TeacherID: { $in: gone } })
@@ -210,6 +252,9 @@ app.post('/api/databases/:id/tables/:table/status', adminOnly, withDb, withTable
   const tids = req.params.table === 'Teachers' ? (await store.rows.find(filter).toArray()).map((t) => t.TeacherID) : []
   const prefFilter = { dbId: req.dbDoc._id, table: 'TeacherPreferences', TeacherID: { $in: tids } }
   if (status === 'rejected') {
+    const count = await store.rows.countDocuments(filter)
+    const whole = count === (await store.rows.countDocuments({ dbId: req.dbDoc._id, table: req.params.table }))
+    if (!(await adminPasswordOk(req, res, count, whole))) return
     await store.rows.deleteMany(filter)
     if (tids.length) await store.rows.deleteMany(prefFilter)
   } else {
@@ -248,6 +293,7 @@ app.post('/api/databases/:id/import', adminOnly, withDb, wrap(async (req, res) =
 }))
 
 app.delete('/api/databases/:id/rows', adminOnly, withDb, wrap(async (req, res) => {
+  if (!(await adminPasswordOk(req, res, await store.rows.countDocuments({ dbId: req.dbDoc._id }), true))) return
   await store.rows.deleteMany({ dbId: req.dbDoc._id })
   res.json({ ok: true })
 }))
