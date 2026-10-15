@@ -128,11 +128,15 @@ def objective(p):
     return 100 * p[:, 1] + 5 * (1 - p[:, 0]) + p[:, 2] + 0.5 * p[:, 3]
 
 
-def recommend_weights(nets, scale, instance, dev, n=20000, seed=0):
-    """Score n random weight vectors (log-normal around DEFAULT_WEIGHTS) for one instance; return the best."""
+def recommend_weights(nets, scale, instance, dev, bounds=None, n=20000, seed=0):
+    """Score n random weight vectors (log-normal around DEFAULT_WEIGHTS) for one instance; return the best.
+    `bounds` (lo, hi arrays) keeps candidates inside the range seen in training, where predictions mean something."""
     rng = np.random.default_rng(seed)
     base = np.array([DEFAULT_WEIGHTS[w[2:]] for w in WEIGHTS], dtype=np.float64)
-    cand = np.vstack([base, base * np.exp(rng.normal(0, 0.8, (n - 1, len(base))))]).round(1)
+    cand = np.vstack([base, base * np.exp(rng.normal(0, 0.8, (n - 1, len(base))))])
+    if bounds is not None:
+        cand[1:] = np.clip(cand[1:], *bounds)
+    cand = cand.round(1)
     raw = pd.DataFrame(np.repeat([[instance[c] for c in INSTANCE]], n, 0), columns=INSTANCE)
     raw[WEIGHTS] = cand
     p = predict(nets, scale, to_matrix(raw), dev)
@@ -166,7 +170,7 @@ def train(device_name=None, folds=5, ensemble=5, epochs=1500):
     # weight recommendation for each distinct real instance in the log (not the batch instances)
     recs = {}
     for _, r in df[~df.instance.str.startswith("batch_")].drop_duplicates("instance", keep="last").iterrows():
-        w, info = recommend_weights(nets, scale, r, dev)
+        w, info = recommend_weights(nets, scale, r, dev, bounds=(df[WEIGHTS].min().to_numpy(), df[WEIGHTS].max().to_numpy()))
         recs[r.instance] = {"weights": w, **info}
         print(f"{r.instance}: recommended weights {w}\n  predicted default {info['default']}\n  predicted tuned   {info['recommended']}")
     (out / "recommended_weights.json").write_text(json.dumps(recs, indent=2))
