@@ -124,7 +124,15 @@ def run(input_path=None, term="odd", branches=None, gen=None, weights=None, time
            **{k: v for k, v in sol.stats.items()}, "violations": len(problems)}
     log_path = ROOT / "runs" / "runs.csv"
     log_path.parent.mkdir(exist_ok=True)
-    pd.DataFrame([row]).to_csv(log_path, mode="a", header=not log_path.exists(), index=False)
+    out = pd.DataFrame([row])
+    if log_path.exists():  # line up with the existing header: a solve may not report every stat
+        header = pd.read_csv(log_path, nrows=0).columns
+        extra = [c for c in out.columns if c not in header]
+        if extra:  # new stats: rewrite the log once with the wider header
+            pd.concat([pd.read_csv(log_path), out], ignore_index=True).to_csv(log_path, index=False)
+            return sol, row
+        out = out.reindex(columns=header)
+    out.to_csv(log_path, mode="a", header=not log_path.exists(), index=False)
     return sol, row
 
 

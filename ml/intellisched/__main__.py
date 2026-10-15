@@ -4,6 +4,7 @@
   python -m intellisched run --input ../timetable_dataset.xlsx --term odd
   python -m intellisched run --seed 7 --branches CSE ECE --noise 0.03 --time 120
   python -m intellisched batch --n 30 --time 20      # many runs -> runs/runs.csv for the ML layer
+  python -m intellisched live --n 40 --time 15       # the app's real database (read-only) -> runs/runs.csv
   python -m intellisched train                        # outcome model on the GPU + recommended weights
 """
 import argparse
@@ -29,6 +30,11 @@ def main():
     b.add_argument("--n", type=int, default=20)
     b.add_argument("--seed", type=int, default=100)
     b.add_argument("--time", type=int, default=20)
+    lv = sub.add_parser("live", help="the app's database (read via the API) solved n times with random weights -> runs/runs.csv")
+    lv.add_argument("--n", type=int, default=40)
+    lv.add_argument("--time", type=int, default=15)
+    lv.add_argument("--database", help="name or id (default: the database with the most rows)")
+    lv.add_argument("--export-only", action="store_true", help="only save data/live/<database>.xlsx")
     t = sub.add_parser("train", help="runs/runs.csv -> outcome model (GPU if available) -> models/")
     t.add_argument("--device", help="cuda or cpu (default: cuda when available)")
     t.add_argument("--epochs", type=int, default=1500)
@@ -37,6 +43,13 @@ def main():
     if a.cmd == "run":
         gen = None if a.input else GenConfig(seed=a.seed, branches=a.gen_branches, noise=a.noise)
         run(a.input, term=None if a.term == "all" else a.term, branches=a.branches, gen=gen, time_limit=a.time, name=a.name)
+    elif a.cmd == "live":
+        from .live import export_live, live_batch
+        if a.export_only:
+            path, info = export_live(a.database)
+            print(path, info)
+        else:
+            live_batch(a.n, a.time, a.database)
     elif a.cmd == "batch":
         batch(a.n, a.seed, a.time)
     else:

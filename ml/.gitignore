@@ -2,6 +2,7 @@
 __pycache__/
 data/synthetic/
 data/clean/
+data/live/
 reports/
 runs/
 models/
