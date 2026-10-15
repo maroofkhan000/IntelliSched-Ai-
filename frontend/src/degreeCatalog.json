@@ -1,0 +1,324 @@
+[
+  { "Degree": "B.Tech", "Name": "Bachelor of Technology", "Level": "Undergraduate", "TotalYears": 4, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "CSE", "BranchName": "Computer Science & Engineering" },
+    { "BranchCode": "AIML", "BranchName": "CSE (Artificial Intelligence & Machine Learning)" },
+    { "BranchCode": "DSAI", "BranchName": "CSE (Data Science & Artificial Intelligence)" },
+    { "BranchCode": "CCAI", "BranchName": "CSE (Cloud Computing & Artificial Intelligence)" },
+    { "BranchCode": "CSAI", "BranchName": "CSE (Cyber Security & Artificial Intelligence)" },
+    { "BranchCode": "CSDS", "BranchName": "CSE (Data Science)" },
+    { "BranchCode": "CSCS", "BranchName": "CSE (Cyber Security)" },
+    { "BranchCode": "CSIOT", "BranchName": "CSE (Internet of Things)" },
+    { "BranchCode": "COE", "BranchName": "Computer Engineering" },
+    { "BranchCode": "IT", "BranchName": "Information Technology" },
+    { "BranchCode": "ECE", "BranchName": "Electronics & Communication Engineering" },
+    { "BranchCode": "ETE", "BranchName": "Electronics & Telecommunication Engineering" },
+    { "BranchCode": "ELE", "BranchName": "Electronics Engineering" },
+    { "BranchCode": "ECM", "BranchName": "Electronics & Computer Engineering" },
+    { "BranchCode": "EIE", "BranchName": "Electronics & Instrumentation Engineering" },
+    { "BranchCode": "ICE", "BranchName": "Instrumentation & Control Engineering" },
+    { "BranchCode": "EE", "BranchName": "Electrical Engineering" },
+    { "BranchCode": "EEE", "BranchName": "Electrical & Electronics Engineering" },
+    { "BranchCode": "ECS", "BranchName": "Electrical & Computer Science Engineering" },
+    { "BranchCode": "EEIC", "BranchName": "Electrical Engineering & Industrial Control" },
+    { "BranchCode": "ME", "BranchName": "Mechanical Engineering" },
+    { "BranchCode": "ME-EV", "BranchName": "Mechanical Engineering (Electric Vehicle)" },
+    { "BranchCode": "AR", "BranchName": "Automation & Robotics" },
+    { "BranchCode": "AUTO", "BranchName": "Automobile Engineering" },
+    { "BranchCode": "PE", "BranchName": "Production Engineering" },
+    { "BranchCode": "IE", "BranchName": "Industrial Engineering" },
+    { "BranchCode": "TOOL", "BranchName": "Tool Engineering" },
+    { "BranchCode": "MARINE", "BranchName": "Marine Engineering" },
+    { "BranchCode": "CE", "BranchName": "Civil Engineering" },
+    { "BranchCode": "CEM", "BranchName": "Construction Engineering & Management" },
+    { "BranchCode": "AE", "BranchName": "Aeronautical Engineering" },
+    { "BranchCode": "ASE", "BranchName": "Aerospace Engineering" },
+    { "BranchCode": "CHE", "BranchName": "Chemical Engineering" },
+    { "BranchCode": "PETRO", "BranchName": "Petrochemical & Petroleum Refinery Engineering" },
+    { "BranchCode": "BT", "BranchName": "Biotechnology" },
+    { "BranchCode": "BME", "BranchName": "Biomedical Engineering" },
+    { "BranchCode": "FT", "BranchName": "Food Technology" },
+    { "BranchCode": "TEX", "BranchName": "Textile Engineering" },
+    { "BranchCode": "MIN", "BranchName": "Mining Engineering" },
+    { "BranchCode": "MME", "BranchName": "Metallurgical & Materials Engineering" },
+    { "BranchCode": "AGE", "BranchName": "Agricultural Engineering" },
+    { "BranchCode": "ANIM", "BranchName": "3D Animation Engineering" }
+  ] },
+  { "Degree": "B.Tech + M.Tech (Dual)", "Name": "Integrated B.Tech + M.Tech (Dual Degree)", "Level": "Integrated", "TotalYears": 5, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "DD-CSE", "BranchName": "Computer Science & Engineering" },
+    { "BranchCode": "DD-ECE", "BranchName": "Electronics & Communication Engineering" },
+    { "BranchCode": "DD-EE", "BranchName": "Electrical Engineering" },
+    { "BranchCode": "DD-ME", "BranchName": "Mechanical Engineering" },
+    { "BranchCode": "DD-CE", "BranchName": "Civil Engineering" }
+  ] },
+  { "Degree": "Diploma (Polytechnic)", "Name": "Diploma in Engineering", "Level": "Diploma", "TotalYears": 3, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "DIP-CSE", "BranchName": "Computer Science & Engineering" },
+    { "BranchCode": "DIP-IT", "BranchName": "Information Technology" },
+    { "BranchCode": "DIP-ECE", "BranchName": "Electronics & Communication Engineering" },
+    { "BranchCode": "DIP-EE", "BranchName": "Electrical Engineering" },
+    { "BranchCode": "DIP-ME", "BranchName": "Mechanical Engineering" },
+    { "BranchCode": "DIP-CE", "BranchName": "Civil Engineering" },
+    { "BranchCode": "DIP-AUTO", "BranchName": "Automobile Engineering" }
+  ] },
+  { "Degree": "B.Arch", "Name": "Bachelor of Architecture", "Code": "BARCH", "Level": "Undergraduate", "TotalYears": 5, "SemestersPerYear": 2, "Branches": [] },
+  { "Degree": "B.Pharm", "Name": "Bachelor of Pharmacy", "Code": "BPHARM", "Level": "Undergraduate", "TotalYears": 4, "SemestersPerYear": 2, "Branches": [] },
+  { "Degree": "D.Pharm", "Name": "Diploma in Pharmacy", "Code": "DPHARM", "Level": "Diploma", "TotalYears": 2, "SemestersPerYear": 2, "Branches": [] },
+  { "Degree": "Pharm.D", "Name": "Doctor of Pharmacy", "Level": "Undergraduate", "TotalYears": 6, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "PHARMD", "BranchName": "Doctor of Pharmacy" },
+    { "BranchCode": "PHARMD-PB", "BranchName": "Pharm.D (Post Baccalaureate)", "TotalYears": 3 }
+  ] },
+  { "Degree": "BHMCT", "Name": "Bachelor of Hotel Management & Catering Technology", "Code": "BHMCT", "Level": "Undergraduate", "TotalYears": 4, "SemestersPerYear": 2, "Branches": [] },
+  { "Degree": "BCA", "Name": "Bachelor of Computer Applications", "Code": "BCA", "Level": "Undergraduate", "TotalYears": 3, "SemestersPerYear": 2, "Branches": [] },
+  { "Degree": "BBA", "Name": "Bachelor of Business Administration", "Level": "Undergraduate", "TotalYears": 3, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "BBA", "BranchName": "BBA (General)" },
+    { "BranchCode": "BBA-FIN", "BranchName": "BBA (Finance)" },
+    { "BranchCode": "BBA-MKT", "BranchName": "BBA (Marketing)" },
+    { "BranchCode": "BBA-HR", "BranchName": "BBA (Human Resource Management)" },
+    { "BranchCode": "BBA-IB", "BranchName": "BBA (International Business)" },
+    { "BranchCode": "BBA-BA", "BranchName": "BBA (Business Analytics)" },
+    { "BranchCode": "BBA-FS", "BranchName": "BBA (Financial Services)" },
+    { "BranchCode": "BBA-SCM", "BranchName": "BBA (Supply Chain Management)" }
+  ] },
+  { "Degree": "B.Com", "Name": "Bachelor of Commerce", "Level": "Undergraduate", "TotalYears": 3, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "BCOM", "BranchName": "B.Com (General)" },
+    { "BranchCode": "BCOM-H", "BranchName": "B.Com (Honours)" },
+    { "BranchCode": "BCOM-AF", "BranchName": "B.Com (Accounting & Finance)" },
+    { "BranchCode": "BCOM-BF", "BranchName": "B.Com (Banking & Insurance)" }
+  ] },
+  { "Degree": "B.Sc", "Name": "Bachelor of Science", "Level": "Undergraduate", "TotalYears": 3, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "BSC-PHY", "BranchName": "Physics", "TotalYears": 4 },
+    { "BranchCode": "BSC-CHEM", "BranchName": "Chemistry", "TotalYears": 4 },
+    { "BranchCode": "BSC-MATH", "BranchName": "Mathematics", "TotalYears": 4 },
+    { "BranchCode": "BSC-CS", "BranchName": "Computer Science" },
+    { "BranchCode": "BSC-IT", "BranchName": "Information Technology" },
+    { "BranchCode": "BSC-DS", "BranchName": "Data Science" },
+    { "BranchCode": "BSC-STAT", "BranchName": "Statistics", "TotalYears": 4 },
+    { "BranchCode": "BSC-BT", "BranchName": "Biotechnology" },
+    { "BranchCode": "BSC-MB", "BranchName": "Microbiology" },
+    { "BranchCode": "BSC-ZOO", "BranchName": "Zoology" },
+    { "BranchCode": "BSC-BOT", "BranchName": "Botany" },
+    { "BranchCode": "BSC-ENV", "BranchName": "Environmental Science", "TotalYears": 4 },
+    { "BranchCode": "BSC-ZBC", "BranchName": "Zoology, Botany & Chemistry (ZBC)" },
+    { "BranchCode": "BSC-BC", "BranchName": "Biochemistry" },
+    { "BranchCode": "BSC-LS", "BranchName": "Life Science" },
+    { "BranchCode": "BSC-ICHEM", "BranchName": "Industrial Chemistry (Hons)", "TotalYears": 4 },
+    { "BranchCode": "BSC-PME", "BranchName": "Physics, Maths & Electronics (PME)" }
+  ] },
+  { "Degree": "B.Sc (4-year professional)", "Name": "Bachelor of Science (4-year professional)", "Level": "Undergraduate", "TotalYears": 4, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "BSC-AG", "BranchName": "Agriculture" },
+    { "BranchCode": "BSC-NUR", "BranchName": "Nursing" }
+  ] },
+  { "Degree": "BA", "Name": "Bachelor of Arts", "Level": "Undergraduate", "TotalYears": 3, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "BA-ENG", "BranchName": "English", "TotalYears": 4 },
+    { "BranchCode": "BA-HIN", "BranchName": "Hindi" },
+    { "BranchCode": "BA-ECO", "BranchName": "Economics" },
+    { "BranchCode": "BA-HIS", "BranchName": "History" },
+    { "BranchCode": "BA-POL", "BranchName": "Political Science" },
+    { "BranchCode": "BA-PSY", "BranchName": "Psychology" },
+    { "BranchCode": "BA-SOC", "BranchName": "Sociology" },
+    { "BranchCode": "BA-GEO", "BranchName": "Geography" },
+    { "BranchCode": "BA-JMC", "BranchName": "Journalism & Mass Communication" },
+    { "BranchCode": "BA-SS", "BranchName": "Social Sciences (NEP)", "TotalYears": 4 }
+  ] },
+  { "Degree": "B.Des", "Name": "Bachelor of Design", "Level": "Undergraduate", "TotalYears": 4, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "BDES-FD", "BranchName": "Fashion Design" },
+    { "BranchCode": "BDES-CD", "BranchName": "Communication Design" },
+    { "BranchCode": "BDES-PD", "BranchName": "Product Design" },
+    { "BranchCode": "BDES-ID", "BranchName": "Interior Design" },
+    { "BranchCode": "BDES-UX", "BranchName": "UI / UX Design" },
+    { "BranchCode": "BDES-PID", "BranchName": "Product & Interior Design" }
+  ] },
+  { "Degree": "LLB", "Name": "Bachelor of Laws (3-year)", "Code": "LLB", "Level": "Undergraduate", "TotalYears": 3, "SemestersPerYear": 2, "Branches": [] },
+  { "Degree": "Integrated Law", "Name": "Integrated Law (5-year)", "Level": "Integrated", "TotalYears": 5, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "BALLB", "BranchName": "BA LLB" },
+    { "BranchCode": "BBALLB", "BranchName": "BBA LLB" },
+    { "BranchCode": "BCOMLLB", "BranchName": "B.Com LLB" }
+  ] },
+  { "Degree": "B.Ed", "Name": "Bachelor of Education", "Code": "BED", "Level": "Undergraduate", "TotalYears": 2, "SemestersPerYear": 2, "Branches": [] },
+  { "Degree": "M.Tech", "Name": "Master of Technology", "Level": "Postgraduate", "TotalYears": 2, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "MT-CSE", "BranchName": "Computer Science & Engineering" },
+    { "BranchCode": "MT-ACDS", "BranchName": "CSE (Advanced Computing & Data Science)" },
+    { "BranchCode": "MT-AIML", "BranchName": "Artificial Intelligence & Machine Learning" },
+    { "BranchCode": "MT-CYS", "BranchName": "Cyber Security" },
+    { "BranchCode": "MT-IT", "BranchName": "Information Technology" },
+    { "BranchCode": "MT-RAI", "BranchName": "Robotics & Artificial Intelligence" },
+    { "BranchCode": "MT-ECE", "BranchName": "Electronics & Communication Engineering" },
+    { "BranchCode": "MT-ECSE", "BranchName": "Electronic Circuits & Systems Engineering" },
+    { "BranchCode": "MT-VLSI", "BranchName": "VLSI Design" },
+    { "BranchCode": "MT-ES", "BranchName": "Embedded Systems" },
+    { "BranchCode": "MT-EPDT", "BranchName": "Electronics Product Design & Technology" },
+    { "BranchCode": "MT-EE", "BranchName": "Electrical Engineering" },
+    { "BranchCode": "MT-PE", "BranchName": "Power Engineering" },
+    { "BranchCode": "MT-PS", "BranchName": "Power Systems" },
+    { "BranchCode": "MT-ME", "BranchName": "Mechanical Engineering" },
+    { "BranchCode": "MT-TE", "BranchName": "Thermal Engineering" },
+    { "BranchCode": "MT-CADCAM", "BranchName": "CAD / CAM" },
+    { "BranchCode": "MT-PRE", "BranchName": "Production Engineering" },
+    { "BranchCode": "MT-PIE", "BranchName": "Production & Industrial Engineering" },
+    { "BranchCode": "MT-IE", "BranchName": "Industrial Engineering" },
+    { "BranchCode": "MT-CE", "BranchName": "Civil Engineering" },
+    { "BranchCode": "MT-SE", "BranchName": "Structural Engineering" },
+    { "BranchCode": "MT-SD", "BranchName": "Structural Design" },
+    { "BranchCode": "MT-GE", "BranchName": "Geotechnical Engineering" },
+    { "BranchCode": "MT-SMFE", "BranchName": "Soil Mechanics & Foundation Engineering" },
+    { "BranchCode": "MT-HWR", "BranchName": "Hydraulics & Water Resources Engineering" },
+    { "BranchCode": "MT-ENV", "BranchName": "Environmental Science & Engineering" },
+    { "BranchCode": "MT-CTM", "BranchName": "Construction Technology & Management" },
+    { "BranchCode": "MT-BT", "BranchName": "Biotechnology" },
+    { "BranchCode": "MT-NST", "BranchName": "Nano Science & Technology" },
+    { "BranchCode": "MT-FT", "BranchName": "Food Technology" },
+    { "BranchCode": "MT-BINF", "BranchName": "Bioinformatics" }
+  ] },
+  { "Degree": "MCA", "Name": "Master of Computer Applications", "Level": "Postgraduate", "TotalYears": 2, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "MCA", "BranchName": "Master of Computer Applications" },
+    { "BranchCode": "MCA-AIML", "BranchName": "MCA (Artificial Intelligence & Machine Learning)" },
+    { "BranchCode": "MCA-DS", "BranchName": "MCA (Data Science)" }
+  ] },
+  { "Degree": "MBA", "Name": "Master of Business Administration", "Level": "Postgraduate", "TotalYears": 2, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "MBA", "BranchName": "MBA (General)" },
+    { "BranchCode": "MBA-FIN", "BranchName": "MBA (Finance)" },
+    { "BranchCode": "MBA-MKT", "BranchName": "MBA (Marketing)" },
+    { "BranchCode": "MBA-HR", "BranchName": "MBA (Human Resource Management)" },
+    { "BranchCode": "MBA-IB", "BranchName": "MBA (International Business)" },
+    { "BranchCode": "MBA-BA", "BranchName": "MBA (Business Analytics)" },
+    { "BranchCode": "MBA-SCM", "BranchName": "MBA (Supply Chain Management)" },
+    { "BranchCode": "MBA-OPS", "BranchName": "MBA (Operations Management)" },
+    { "BranchCode": "MBA-HCM", "BranchName": "MBA (Hospital & Healthcare Management)" },
+    { "BranchCode": "MBA-EXE", "BranchName": "MBA (Executive)" },
+    { "BranchCode": "MBA-DD", "BranchName": "MBA-M.Sc Double Degree (IBS)" }
+  ] },
+  { "Degree": "Integrated MBA", "Name": "Integrated MBA (BBA + MBA)", "Code": "IMBA", "Level": "Integrated", "TotalYears": 5, "SemestersPerYear": 2, "Branches": [] },
+  { "Degree": "M.Pharm", "Name": "Master of Pharmacy", "Level": "Postgraduate", "TotalYears": 2, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "MP-PCEU", "BranchName": "Pharmaceutics" },
+    { "BranchCode": "MP-PCOL", "BranchName": "Pharmacology" },
+    { "BranchCode": "MP-PCOG", "BranchName": "Pharmacognosy" },
+    { "BranchCode": "MP-PCHEM", "BranchName": "Pharmaceutical Chemistry" },
+    { "BranchCode": "MP-PA", "BranchName": "Pharmaceutical Analysis" },
+    { "BranchCode": "MP-IP", "BranchName": "Industrial Pharmacy" },
+    { "BranchCode": "MP-PMRA", "BranchName": "Pharmaceutical Management & Regulatory Affairs" },
+    { "BranchCode": "MP-PP", "BranchName": "Pharmacy Practice" }
+  ] },
+  { "Degree": "M.Arch", "Name": "Master of Architecture", "Level": "Postgraduate", "TotalYears": 2, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "MARCH", "BranchName": "Master of Architecture (General)" },
+    { "BranchCode": "MARCH-UD", "BranchName": "Urban Design" },
+    { "BranchCode": "MARCH-LA", "BranchName": "Landscape Architecture" },
+    { "BranchCode": "MARCH-CON", "BranchName": "Architectural Conservation" },
+    { "BranchCode": "MARCH-SUS", "BranchName": "Sustainable Architecture" },
+    { "BranchCode": "MARCH-PT", "BranchName": "M.Arch (Part Time)", "TotalYears": 3 }
+  ] },
+  { "Degree": "M.Plan", "Name": "Master of Planning", "Level": "Postgraduate", "TotalYears": 2, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "MPL-URP", "BranchName": "Urban & Regional Planning" },
+    { "BranchCode": "MPL-TP", "BranchName": "Transport Planning" }
+  ] },
+  { "Degree": "M.Des", "Name": "Master of Design", "Level": "Postgraduate", "TotalYears": 2, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "MDES-ID", "BranchName": "Industrial Design" },
+    { "BranchCode": "MDES-CD", "BranchName": "Communication Design" },
+    { "BranchCode": "MDES-IXD", "BranchName": "Interaction Design" }
+  ] },
+  { "Degree": "M.Sc", "Name": "Master of Science", "Level": "Postgraduate", "TotalYears": 2, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "MSC-PHY", "BranchName": "Physics" },
+    { "BranchCode": "MSC-CHEM", "BranchName": "Chemistry" },
+    { "BranchCode": "MSC-MATH", "BranchName": "Mathematics" },
+    { "BranchCode": "MSC-CS", "BranchName": "Computer Science" },
+    { "BranchCode": "MSC-DS", "BranchName": "Data Science" },
+    { "BranchCode": "MSC-STAT", "BranchName": "Statistics" },
+    { "BranchCode": "MSC-BT", "BranchName": "Biotechnology" },
+    { "BranchCode": "MSC-MB", "BranchName": "Microbiology" },
+    { "BranchCode": "MSC-ENV", "BranchName": "Environmental Science" },
+    { "BranchCode": "MSC-NUR", "BranchName": "Nursing" },
+    { "BranchCode": "MSC-BC", "BranchName": "Biochemistry" },
+    { "BranchCode": "MSC-ICHEM", "BranchName": "Industrial Chemistry" }
+  ] },
+  { "Degree": "M.Com", "Name": "Master of Commerce", "Code": "MCOM", "Level": "Postgraduate", "TotalYears": 2, "SemestersPerYear": 2, "Branches": [] },
+  { "Degree": "MA", "Name": "Master of Arts", "Level": "Postgraduate", "TotalYears": 2, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "MA-ENG", "BranchName": "English" },
+    { "BranchCode": "MA-HIN", "BranchName": "Hindi" },
+    { "BranchCode": "MA-ECO", "BranchName": "Economics" },
+    { "BranchCode": "MA-HIS", "BranchName": "History" },
+    { "BranchCode": "MA-POL", "BranchName": "Political Science" },
+    { "BranchCode": "MA-PSY", "BranchName": "Psychology" },
+    { "BranchCode": "MA-SOC", "BranchName": "Sociology" },
+    { "BranchCode": "MA-JMC", "BranchName": "Journalism & Mass Communication" },
+    { "BranchCode": "MA-CP", "BranchName": "Clinical Psychology" },
+    { "BranchCode": "MA-PA", "BranchName": "Public Administration" }
+  ] },
+  { "Degree": "LLM", "Name": "Master of Laws", "Level": "Postgraduate", "TotalYears": 1, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "LLM", "BranchName": "Master of Laws" },
+    { "BranchCode": "LLM-IL", "BranchName": "LL.M (International Law, 1-year)" },
+    { "BranchCode": "LLM-CFS", "BranchName": "LL.M (Criminal & Forensic Sciences, 2-year)", "TotalYears": 2 }
+  ] },
+  { "Degree": "M.Ed", "Name": "Master of Education", "Code": "MED", "Level": "Postgraduate", "TotalYears": 2, "SemestersPerYear": 2, "Branches": [] },
+  { "Degree": "B.Sc (Nursing, Post Basic)", "Name": "Post Basic B.Sc Nursing", "Level": "Undergraduate", "TotalYears": 2, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "PBBSC-NUR", "BranchName": "Post Basic B.Sc Nursing" }
+  ] },
+  { "Degree": "Diploma (Nursing)", "Name": "Diploma in Nursing", "Level": "Diploma", "TotalYears": 3, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "GNM", "BranchName": "General Nursing & Midwifery (GNM)" },
+    { "BranchCode": "ANM", "BranchName": "Auxiliary Nurse & Midwife (ANM)", "TotalYears": 2 }
+  ] },
+  { "Degree": "BPT", "Name": "Bachelor of Physiotherapy", "Level": "Undergraduate", "TotalYears": 5, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "BPT", "BranchName": "Bachelor of Physiotherapy" }
+  ] },
+  { "Degree": "MPT", "Name": "Master of Physiotherapy", "Level": "Postgraduate", "TotalYears": 2, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "MPT-CP", "BranchName": "Cardiopulmonary Sciences" },
+    { "BranchCode": "MPT-NEURO", "BranchName": "Neurosciences" },
+    { "BranchCode": "MPT-MSK", "BranchName": "Musculoskeletal Sciences" },
+    { "BranchCode": "MPT-SPORTS", "BranchName": "Sports Sciences" }
+  ] },
+  { "Degree": "B.Sc (Paramedical)", "Name": "Bachelor of Science (Paramedical & Allied Health)", "Level": "Undergraduate", "TotalYears": 3, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "PM-BMLT", "BranchName": "B.Sc Medical Laboratory Technology" },
+    { "BranchCode": "PM-BMLS", "BranchName": "Bachelor of Medical Laboratory Science", "TotalYears": 4 },
+    { "BranchCode": "PM-BMRIS", "BranchName": "Bachelor of Medical Radiological Imaging Sciences", "TotalYears": 4 },
+    { "BranchCode": "PM-BRIT", "BranchName": "B.Sc Radiological Imaging Technology" },
+    { "BranchCode": "PM-BOTT", "BranchName": "B.Sc Operation Theatre Technology" },
+    { "BranchCode": "PM-BAOTT", "BranchName": "B.Sc Anaesthesia & Operation Theatre Technology" },
+    { "BranchCode": "PM-BOPT", "BranchName": "Bachelor of Optometry", "TotalYears": 4 },
+    { "BranchCode": "PM-BDT", "BranchName": "B.Sc Dialysis Technology" },
+    { "BranchCode": "PM-BDTT", "BranchName": "Bachelor of Dialysis Therapy Technology" },
+    { "BranchCode": "PM-BCVT", "BranchName": "B.Sc Cardiovascular Technology" },
+    { "BranchCode": "PM-BAICT", "BranchName": "B.Sc Anaesthesiology & Intensive Care Technology" },
+    { "BranchCode": "PM-BND", "BranchName": "B.Sc Nutrition & Dietetics" },
+    { "BranchCode": "PM-BFS", "BranchName": "B.Sc Forensic Science" },
+    { "BranchCode": "PM-BBT", "BranchName": "B.Sc Blood Banking Technology" },
+    { "BranchCode": "PM-BRCT", "BranchName": "B.Sc Respiratory Care Technology" }
+  ] },
+  { "Degree": "M.Sc (Paramedical)", "Name": "Master of Science (Paramedical & Allied Health)", "Level": "Postgraduate", "TotalYears": 2, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "PM-MMLT", "BranchName": "M.Sc Medical Laboratory Technology" },
+    { "BranchCode": "PM-MMLS", "BranchName": "Master of Medical Laboratory Sciences" },
+    { "BranchCode": "PM-MMRIS", "BranchName": "Master of Medical Radiological Imaging Sciences" },
+    { "BranchCode": "PM-MRIT", "BranchName": "M.Sc Radiology & Imaging Technology" },
+    { "BranchCode": "PM-MOPT", "BranchName": "Master of Optometry" },
+    { "BranchCode": "PM-MFS", "BranchName": "M.Sc Forensic Science" }
+  ] },
+  { "Degree": "B.Sc (Medical)", "Name": "Bachelor of Science (Medical Sciences)", "Level": "Undergraduate", "TotalYears": 3, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "MED-BMA", "BranchName": "B.Sc Medical Anatomy" },
+    { "BranchCode": "MED-BMB", "BranchName": "B.Sc Medical Biochemistry" },
+    { "BranchCode": "MED-BMM", "BranchName": "B.Sc Medical Microbiology" },
+    { "BranchCode": "MED-BMP", "BranchName": "B.Sc Medical Physiology" }
+  ] },
+  { "Degree": "M.Sc (Medical)", "Name": "Master of Science (Medical Sciences)", "Level": "Postgraduate", "TotalYears": 2, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "MED-MMA", "BranchName": "M.Sc Medical Anatomy" },
+    { "BranchCode": "MED-MMB", "BranchName": "M.Sc Medical Biochemistry" },
+    { "BranchCode": "MED-MMM", "BranchName": "M.Sc Medical Microbiology" },
+    { "BranchCode": "MED-MMP", "BranchName": "M.Sc Medical Physiology" },
+    { "BranchCode": "MED-MPHM", "BranchName": "M.Sc Medical Pharmacology" },
+    { "BranchCode": "MED-MCP", "BranchName": "M.Sc Clinical Psychology" }
+  ] },
+  { "Degree": "MHA", "Name": "Master of Hospital Administration", "Level": "Postgraduate", "TotalYears": 2, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "MHA", "BranchName": "Master of Hospital Administration" }
+  ] },
+  { "Degree": "MPH", "Name": "Master of Public Health", "Level": "Postgraduate", "TotalYears": 2, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "MPH", "BranchName": "Master of Public Health" }
+  ] },
+  { "Degree": "PG Diploma", "Name": "Post Graduate Diploma", "Level": "Diploma", "TotalYears": 1, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "PGD-DRRM", "BranchName": "Disaster Risk Reduction & Management" },
+    { "BranchCode": "PGDGC", "BranchName": "Guidance & Counselling" }
+  ] },
+  { "Degree": "MSW", "Name": "Master of Social Work", "Level": "Postgraduate", "TotalYears": 2, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "MSW", "BranchName": "Master of Social Work" }
+  ] },
+  { "Degree": "Diploma (Architecture)", "Name": "Diploma in Architecture", "Level": "Diploma", "TotalYears": 3, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "DARCH", "BranchName": "Diploma in Architecture" }
+  ] },
+  { "Degree": "D.El.Ed", "Name": "Diploma in Elementary Education", "Level": "Diploma", "TotalYears": 2, "SemestersPerYear": 2, "Branches": [
+    { "BranchCode": "DELED", "BranchName": "Diploma in Elementary Education" }
+  ] }
+]

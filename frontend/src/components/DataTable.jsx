@@ -59,10 +59,9 @@ export default function DataTable({ table, onEdit }) {
   const selRows = rows.filter((r) => sel.has(r._id))
   const deletable = selRows.filter((r) => canDeleteRow(table, r))
 
-  const bulkDelete = () => {
-    if (!deletable.length || !window.confirm(`Delete ${deletable.length} row(s)?`)) return
-    deleteRows(table, deletable.map((r) => r._id))
-    setSel(new Set())
+  // deleteRows asks for confirmation itself; the selection is kept if that is cancelled
+  const bulkDelete = async () => {
+    if (deletable.length && await deleteRows(table, deletable.map((r) => r._id))) setSel(new Set())
   }
   const bulkApprove = () => { setStatus(table, selRows.map((r) => r._id), 'approved'); setSel(new Set()) }
 
@@ -86,7 +85,7 @@ export default function DataTable({ table, onEdit }) {
         <input className="search" placeholder="Search…" value={q} onChange={(e) => { setQ(e.target.value); setPage(0) }} />
         {t.filterBy && (
           <select value={filter} onChange={(e) => { setFilter(e.target.value); setPage(0) }}>
-            <option value="">All {t.columns.find((c) => c.key === t.filterBy).label}s</option>
+            <option value="">All {t.columns.find((c) => c.key === t.filterBy).label.replace(/(ch|sh|s|x)$/, '$1e').replace(/y$/, 'ie')}s</option>
             {filterOptions.map((o) => <option key={o} value={o}>{o}</option>)}
           </select>
         )}
@@ -130,7 +129,7 @@ export default function DataTable({ table, onEdit }) {
                 {t.columns.map((c) => <td key={c.key} className={c.type === 'number' ? 'num' : ''}>{cell(r, c)}</td>)}
                 {table === 'Teachers' && (
                   <td className="prefcell">
-                    {(prefsByTeacher.get(r.TeacherID) ?? []).map((p) => <span key={p.SubjectCode} className="tag" title={`Priority ${p.Priority} · ${p.ExperienceYears ?? 0} yrs · ${p.ResearchPapers ?? 0} papers`}>{p.SubjectCode} · P{p.Priority}</span>)}
+                    {(prefsByTeacher.get(r.TeacherID) ?? []).map((p) => <span key={p.SubjectCode} className="tag" title={`Priority ${p.Priority} · ${p.ExperienceYears ?? 0} yrs`}>{p.SubjectCode} · P{p.Priority}</span>)}
                     {!prefsByTeacher.has(r.TeacherID) && <span className="empty">—</span>}
                   </td>
                 )}
@@ -140,7 +139,7 @@ export default function DataTable({ table, onEdit }) {
                   <td className="act">
                     <button className="link" onClick={() => onEdit(r)}>Edit</button>
                     {canDeleteRow(table, r) && (
-                      <button className="link danger" onClick={() => window.confirm('Delete this row?') && deleteRows(table, [r._id])}>Delete</button>
+                      <button className="link danger" onClick={() => deleteRows(table, [r._id])}>Delete</button>
                     )}
                   </td>
                 )}

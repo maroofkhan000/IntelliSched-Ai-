@@ -55,7 +55,8 @@ export const TABLES = {
     key: ['BranchCode'],
     adminOnly: true,
     columns: [
-      { key: 'Degree', label: 'Degree', type: 'select', options: ['B.Tech', 'M.Tech', 'BCA', 'MCA', 'MBA'], required: true },
+      // the form offers degrees from frontend/src/degreeCatalog.json, or a typed-in one
+      { key: 'Degree', label: 'Degree', required: true },
       { key: 'BranchCode', label: 'Branch Code', required: true, upper: true },
       { key: 'BranchName', label: 'Branch Name', required: true },
       { key: 'TotalYears', label: 'Total Years', type: 'number', min: 1, max: 6, required: true },
@@ -80,7 +81,7 @@ export const TABLES = {
     ],
     defaults: { Strength: 60 },
     derive: (r) => ({
-      Year: r.Semester ? yearOf(r.Semester) : '',
+      Year: r.Semester ? yearOf(r.Semester) : (r.Year ?? ''),
       SectionID: r.BranchCode && r.Semester && r.Section ? `${r.BranchCode}-Y${yearOf(r.Semester)}S${r.Semester}-${r.Section}` : '',
     }),
   },
@@ -118,10 +119,8 @@ export const TABLES = {
       { key: 'BranchCode', label: 'Branch', type: 'ref', ref: 'Branches', refKey: 'BranchCode', required: true },
       { key: 'Designation', label: 'Designation', type: 'select', options: ['Professor', 'Associate Professor', 'Assistant Professor', 'Lecturer', 'Visiting Faculty'], required: true },
       { key: 'MaxWeeklyLoad', label: 'Max Weekly Load (hrs)', type: 'number', min: 1, max: 40, required: true },
-      // moving between buildings (all optional; blank = no restriction)
+      // optional: the block they prefer to teach in (blank = no preference)
       { key: 'HomeBuilding', label: 'Home Building', type: 'ref', ref: 'Buildings', refKey: 'BuildingCode', refLabel: 'BuildingName' },
-      { key: 'MaxBuildingChanges', label: 'Max building changes / day', type: 'number', min: 0, max: 10 },
-      { key: 'ExtraTravelMinutes', label: 'Extra travel time (min)', type: 'number', min: 0, max: 60 },
     ],
     defaults: { Designation: 'Assistant Professor', MaxWeeklyLoad: 18 },
     // a new teacher gets the next free ID for their type; existing IDs never change
@@ -131,7 +130,7 @@ export const TABLES = {
   TeacherPreferences: {
     label: 'Teacher Preferences',
     icon: '⭐',
-    hint: `Which subjects each teacher wants to teach, ranked by priority (1 = most wanted, at most ${MAX_TOP_PRIORITY} per teacher), with their experience, how often they taught it and published papers in that area. Auto-assign uses all of these.`,
+    hint: `Which subjects each teacher wants to teach, ranked by priority (1 = most wanted, at most ${MAX_TOP_PRIORITY} per teacher), with their years of experience in it. Auto-assign goes by priority, then experience.`,
     key: ['TeacherID', 'SubjectCode'],
     filterBy: 'TeacherID',
     columns: [
@@ -139,8 +138,6 @@ export const TABLES = {
       { key: 'SubjectCode', label: 'Subject', type: 'ref', ref: 'Subjects', refKey: 'SubjectCode', refLabel: 'SubjectName', required: true },
       { key: 'Priority', label: 'Priority (1 = highest)', type: 'select', options: [1, 2, 3, 4, 5], numeric: true, required: true },
       { key: 'ExperienceYears', label: 'Experience (years)', type: 'number', min: 0, max: 60 },
-      { key: 'TimesTaught', label: 'Times taught before', type: 'number', min: 0, max: 100 },
-      { key: 'ResearchPapers', label: 'Published research papers', type: 'number', min: 0, max: 1000 },
       { key: 'Remarks', label: 'Remarks' },
     ],
     defaults: { Priority: 1 },

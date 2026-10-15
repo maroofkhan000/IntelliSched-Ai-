@@ -2,30 +2,17 @@
 //
 // A teacher's claim on a subject is ordered by:
 //   1. Priority they gave it (1 = most wanted; each teacher may have only a few priority-1 subjects)
-//   2. Fit score 0-100 from Teacher Preferences, each part capped so no single number dominates:
-//        40  experience in the area (capped at 20 years)
-//        25  times taught this subject before (capped at 5)
-//        20  research papers in the area (log scale, capped at 50)
-//        15  teacher belongs to the subject's branch
-//      minus SHARE_PENALTY for every section of this subject the teacher already has, so teachers
-//      with similar scores split the sections instead of one taking them all
-//   3. Lower share of their max weekly load used (load / max, not raw hours)
-//   4. A fixed per-subject shuffle, so the last tie-break doesn't always favour the same IDs
+//   2. More years of experience in the subject
+//   and when those are equal:
+//   3. Fewer sections of this subject already held, so equals split the sections instead of one taking them all
+//   4. Teacher belongs to the subject's branch
+//   5. Lower share of their max weekly load used (load / max, not raw hours)
+//   6. A fixed per-subject shuffle, so the last tie-break doesn't always favour the same IDs
 // Only approved rows are used. Assignments already in the table are kept and their hours count
 // against each teacher's max weekly load.
 
 const approved = (rows = []) => rows.filter((r) => r._status === 'approved')
 const num = (v) => Number(v) || 0
-
-export const SHARE_PENALTY = 15
-
-export function fitScore(pref, teacher, subjectBranch) {
-  const years = Math.min(num(pref.ExperienceYears), 20) / 20
-  const taught = Math.min(num(pref.TimesTaught), 5) / 5
-  const papers = Math.log1p(Math.min(num(pref.ResearchPapers), 50)) / Math.log1p(50)
-  const home = subjectBranch && teacher.BranchCode === subjectBranch ? 1 : 0
-  return Math.round(40 * years + 25 * taught + 20 * papers + 15 * home)
-}
 
 // stable pseudo-random order per subject (FNV-1a hash), used only as the very last tie-break
 const shuffleKey = (s) => { let h = 2166136261; for (const ch of s) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return h >>> 0 }
@@ -51,7 +38,7 @@ export function sectionCounts(db) {
 }
 
 const share = (c) => (c.max ? c.load / c.max : 1)
-const byClaim = (a, b) => (a.priority - b.priority) || (b.score - a.score) || (share(a) - share(b)) || (a.tie - b.tie)
+const byClaim = (a, b) => (a.priority - b.priority) || (b.years - a.years) || (a.held - b.held) || (b.sameBranch - a.sameBranch) || (share(a) - share(b)) || (a.tie - b.tie)
 
 // Everyone who listed `subjectCode` in Preferences, best claim first.
 export function rankTeachers(db, subjectCode, loads = teacherLoads(db), counts = sectionCounts(db)) {
@@ -62,11 +49,9 @@ export function rankTeachers(db, subjectCode, loads = teacherLoads(db), counts =
     if (p.SubjectCode !== subjectCode) continue
     const teacher = teachers.get(p.TeacherID)
     if (!teacher) continue
-    const fit = fitScore(p, teacher, subjectBranch)
-    const held = counts.get(`${teacher.TeacherID}|${subjectCode}`) ?? 0
     out.push({
-      teacher, priority: num(p.Priority) || 9, years: num(p.ExperienceYears), taught: num(p.TimesTaught), papers: num(p.ResearchPapers),
-      fit, held, score: fit - SHARE_PENALTY * held, load: loads.get(teacher.TeacherID) ?? 0, max: num(teacher.MaxWeeklyLoad),
+      teacher, priority: num(p.Priority) || 9, years: num(p.ExperienceYears), sameBranch: subjectBranch && teacher.BranchCode === subjectBranch ? 1 : 0,
+      held: counts.get(`${teacher.TeacherID}|${subjectCode}`) ?? 0, load: loads.get(teacher.TeacherID) ?? 0, max: num(teacher.MaxWeeklyLoad),
       tie: shuffleKey(`${subjectCode}|${teacher.TeacherID}`),
     })
   }
@@ -104,15 +89,14 @@ export function suggestAssignments({ db, scope = {}, fallback = false }) {
     loads.set(pick.teacher.TeacherID, (loads.get(pick.teacher.TeacherID) ?? 0) + j.hours)
     const k = `${pick.teacher.TeacherID}|${j.sub.SubjectCode}`
     counts.set(k, (counts.get(k) ?? 0) + 1)
-    assignments.push({ SectionID: j.sec.SectionID, SubjectCode: j.sub.SubjectCode, SubjectName: j.sub.SubjectName, hours: j.hours, TeacherID: pick.teacher.TeacherID, TeacherName: pick.teacher.Name, priority: pick.priority, years: pick.years, taught: pick.taught, papers: pick.papers, fit: pick.fit, note })
+    assignments.push({ SectionID: j.sec.SectionID, SubjectCode: j.sub.SubjectCode, SubjectName: j.sub.SubjectName, hours: j.hours, TeacherID: pick.teacher.TeacherID, TeacherName: pick.teacher.Name, priority: pick.priority, years: pick.years, note })
   }
 
   // pass 1: honour preferences (this pass always finishes before any fallback is used)
   const left = []
   for (const j of jobs) {
     const live = j.wanted.map((c) => {
-      const held = counts.get(`${c.teacher.TeacherID}|${j.sub.SubjectCode}`) ?? 0
-      return { ...c, load: loads.get(c.teacher.TeacherID) ?? 0, held, score: c.fit - SHARE_PENALTY * held }
+      return { ...c, load: loads.get(c.teacher.TeacherID) ?? 0, held: counts.get(`${c.teacher.TeacherID}|${j.sub.SubjectCode}`) ?? 0 }
     }).sort(byClaim)
       .filter((c) => c.load + j.hours <= num(c.teacher.MaxWeeklyLoad))
     if (live[0]) record(j, live[0], '')
@@ -126,7 +110,7 @@ export function suggestAssignments({ db, scope = {}, fallback = false }) {
       const free = teachers
         .filter((t) => !asked.has(t.TeacherID) && (!t.TeacherType || t.TeacherType === j.sub.Type) && t.BranchCode === j.sec.BranchCode && (loads.get(t.TeacherID) ?? 0) + j.hours <= num(t.MaxWeeklyLoad))
         .sort((x, y) => (loads.get(x.TeacherID) ?? 0) - (loads.get(y.TeacherID) ?? 0))
-      if (free[0]) { record(j, { teacher: free[0], priority: null, years: 0, taught: 0, papers: 0, fit: null }, 'no preference — least-loaded teacher of the branch'); continue }
+      if (free[0]) { record(j, { teacher: free[0], priority: null, years: 0 }, 'no preference — least-loaded teacher of the branch'); continue }
     }
     unassigned.push({ SectionID: j.sec.SectionID, SubjectCode: j.sub.SubjectCode, SubjectName: j.sub.SubjectName, hours: j.hours, reason: j.wanted.length ? 'Every teacher who wants this subject is at their max weekly load' : 'No teacher listed this subject in Preferences' })
   }

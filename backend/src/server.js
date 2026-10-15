@@ -214,7 +214,7 @@ app.post('/api/databases/:id/teachers', withDb, wrap(async (req, res) => {
     if (c.errors.length) return errors.push(...c.errors.map((e) => `${n}: ${e}`))
     if (seen.has(c.clean.SubjectCode)) return errors.push(`${n}: ${c.clean.SubjectCode} is listed twice`)
     seen.add(c.clean.SubjectCode)
-    const same = prevPref && ['Priority', 'ExperienceYears', 'TimesTaught', 'ResearchPapers', 'Remarks'].every((k) => (prevPref[k] ?? '') === (c.clean[k] ?? ''))
+    const same = prevPref && ['Priority', 'ExperienceYears', 'Remarks'].every((k) => (prevPref[k] ?? '') === (c.clean[k] ?? ''))
     if (!same) writes.push(stamp(req.user, dbId, 'TeacherPreferences', c.clean, prevPref))
   })
   const top = topPriorityError(preferences)
@@ -237,7 +237,8 @@ app.post('/api/databases/:id/tables/:table/rows/delete', withDb, withTable, wrap
   if (req.user.role !== 'admin') Object.assign(filter, { _status: 'pending', _by: req.user.username })
   const count = await store.rows.countDocuments(filter)
   const whole = count === (await store.rows.countDocuments({ dbId: req.dbDoc._id, table: req.params.table }))
-  if (!(await adminPasswordOk(req, res, count, whole))) return
+  // a feeder can only reach their own pending rows, so they never need (or get to test) the admin password
+  if (req.user.role === 'admin' && !(await adminPasswordOk(req, res, count, whole))) return
   const gone = req.params.table === 'Teachers' ? (await store.rows.find(filter).toArray()).map((t) => t.TeacherID) : []
   const r = await store.rows.deleteMany(filter)
   if (gone.length) await store.rows.deleteMany({ dbId: req.dbDoc._id, table: { $in: ['TeacherPreferences', 'TeacherAvailability'] }, TeacherID: { $in: gone } })

@@ -1,6 +1,6 @@
 import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import DbManager from './components/DbManager'
-import PasswordPrompt from './components/PasswordPrompt'
+import ConfirmDialog from './components/ConfirmDialog'
 import { TABLES, TABLE_ORDER } from './schema'
 import { StoreProvider, useStore } from './store'
 import Approvals from './pages/Approvals'
@@ -53,7 +53,7 @@ function Shell() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
-      <PasswordPrompt />
+      <ConfirmDialog />
     </div>
   )
 }

@@ -75,7 +75,7 @@ export default function Timetable() {
               </select>
             </label>
             <button className="btn primary" disabled={busy} onClick={generate}>{busy ? 'Generating…' : timetable ? 'Regenerate timetable' : 'Generate timetable'}</button>
-            {timetable && <button className="btn danger" disabled={busy} onClick={() => window.confirm('Delete the generated timetable?') && clearTimetable()}>Clear</button>}
+            {timetable && <button className="btn danger" disabled={busy} onClick={clearTimetable}>Clear</button>}
           </div>
           <p className="muted">Scoping matters: if there are more classes than room-hours (see Data readiness on Overview), pick odd or even semesters or one branch, otherwise some classes will be reported as unscheduled.</p>
           {msg.text && <p className={msg.bad ? 'errors' : 'ok'} role="status">{msg.text}</p>}

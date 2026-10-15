@@ -108,7 +108,7 @@ export default function Overview() {
             <button className="btn" disabled={busy} onClick={loadSample}>Load sample dataset</button>
             <button className="btn" disabled={busy} onClick={() => fileRef.current.click()}>Import .xlsx…</button>
             <input ref={fileRef} type="file" accept=".xlsx" hidden onChange={onFile} />
-            <button className="btn danger" disabled={!total} onClick={() => window.confirm('Delete ALL data in every table?') && clearAll()}>Clear everything</button>
+            <button className="btn danger" disabled={!total} onClick={clearAll}>Clear everything</button>
           </div>
           {msg && <p className={msg.startsWith('Import failed') ? 'errors' : 'ok'}>{msg}</p>}
         </section>

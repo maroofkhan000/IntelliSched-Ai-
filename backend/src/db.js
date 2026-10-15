@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs'
 import { randomUUID } from 'node:crypto'
+import dns from 'node:dns'
 import { MongoClient } from 'mongodb'
 import { TABLE_ORDER, defaultSettings } from './schema.js'
 
@@ -8,7 +9,17 @@ export let users, databases, rows, attempts
 
 export async function connect() {
   client = new MongoClient(process.env.MONGODB_URI)
-  await client.connect()
+  try {
+    await client.connect()
+  } catch (err) {
+    // Some home routers answer the mongodb+srv SRV lookup badly (querySrv EBADRESP / ECONNREFUSED)
+    // and the server dies on start. Retry once through public resolvers.
+    if (err?.syscall !== 'querySrv') throw err
+    console.warn(`SRV lookup failed (${err.code}); retrying with public DNS`)
+    dns.setServers(['1.1.1.1', '8.8.8.8'])
+    client = new MongoClient(process.env.MONGODB_URI)
+    await client.connect()
+  }
   const db = client.db(process.env.MONGODB_DB || 'intellisched')
   users = db.collection('users')
   databases = db.collection('databases')

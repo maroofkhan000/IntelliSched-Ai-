@@ -1,9 +1,15 @@
 import { useMemo, useState } from 'react'
-import branchCatalog from '../branchCatalog.json'
+import degreeCatalog from '../degreeCatalog.json'
 import catalog from '../subjectCatalog.json'
 import { rankTeachers, teacherLoads } from '../assigner'
 import { MAX_TOP_PRIORITY, TABLES, topPriorityError, validateRow, withDerived } from '../schema'
 import { useStore } from '../store'
+
+// Branches: each degree lists only its own branches. A degree without branches (B.Arch, BCA...)
+// offers itself as its single branch.
+const DEGREES = new Map(degreeCatalog.map((d) => [d.Degree, d]))
+const DEGREE_LEVELS = [...new Set(degreeCatalog.map((d) => d.Level))]
+const branchesOf = (d) => (!d ? [] : d.Branches.length ? d.Branches : [{ BranchCode: d.Code, BranchName: d.Name }])
 
 // Modal form for adding / editing one row of a table.
 export default function RowForm({ table, row, onClose }) {
@@ -32,22 +38,32 @@ export default function RowForm({ table, row, onClose }) {
   const isTeachers = table === 'Teachers'
   // a teacher's subject preferences are edited right inside the teacher form
   const [prefs, setPrefs] = useState(() => (isTeachers && row
-    ? db.TeacherPreferences.filter((p) => p.TeacherID === row.TeacherID).map((p) => ({ SubjectCode: p.SubjectCode, Priority: p.Priority, ExperienceYears: p.ExperienceYears ?? '', TimesTaught: p.TimesTaught ?? '', ResearchPapers: p.ResearchPapers ?? '' }))
+    ? db.TeacherPreferences.filter((p) => p.TeacherID === row.TeacherID).map((p) => ({ SubjectCode: p.SubjectCode, Priority: p.Priority, ExperienceYears: p.ExperienceYears ?? '' }))
     : []))
   const setPref = (i, patch) => setPrefs((l) => l.map((p, j) => (j === i ? { ...p, ...patch } : p)))
   const isRooms = table === 'Rooms'
+  const isSections = table === 'Sections'
+  const SECTION_LETTERS = 'ABCDEFGHIJ'.split('')
+  const [otherSection, setOtherSection] = useState(() => isSections && editing && Boolean(row.Section) && !SECTION_LETTERS.includes(row.Section))
   // blocks come from the Buildings table once it has rows; until then, the usual A–F
   const BLOCKS = db.Buildings.length ? [...new Set(db.Buildings.map((b) => b.BuildingCode))].sort() : ['A', 'B', 'C', 'D', 'E', 'F']
   const [otherBlock, setOtherBlock] = useState(() => isRooms && editing && Boolean(row.Building) && !BLOCKS.includes(row.Building))
   const [otherRoomNo, setOtherRoomNo] = useState(() => isRooms && editing && Number(row.RoomNo) > 20)
-  const [otherBranch, setOtherBranch] = useState(() => isBranches && editing && !branchCatalog.some((x) => x.BranchCode === row.BranchCode))
+  const [otherDegree, setOtherDegree] = useState(() => isBranches && editing && Boolean(row.Degree) && !DEGREES.has(row.Degree))
+  const [otherBranch, setOtherBranch] = useState(() => isBranches && editing && !branchesOf(DEGREES.get(row.Degree)).some((x) => x.BranchCode === row.BranchCode))
   const inCatalog = (r) => subjectPool.some((s) => s.SubjectCode === r.SubjectCode && (s.BranchCode === r.BranchCode || s.BranchCode === 'ALL') && Number(s.Semester) === Number(r.Semester))
   // "Other": the subject isn't in the catalog, so code and name are typed in
   const [other, setOther] = useState(() => isSubjects && editing && !inCatalog(row))
 
   const preview = useMemo(() => withDerived(table, form, db), [table, form, db])
-  // changing branch/semester invalidates a subject picked from the catalog
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v, ...(isSubjects && !other && (k === 'BranchCode' || k === 'Semester') ? { SubjectCode: '', SubjectName: '' } : {}) }))
+  // changing branch/semester invalidates a subject picked from the catalog, and a section's
+  // year/semester (the new branch may have fewer years)
+  const set = (k, v) => setForm((f) => ({
+    ...f,
+    [k]: v,
+    ...(isSubjects && !other && (k === 'BranchCode' || k === 'Semester') ? { SubjectCode: '', SubjectName: '' } : {}),
+    ...(isSections && k === 'BranchCode' ? { Year: '', Semester: '' } : {}),
+  }))
 
   const submit = (another) => async (e) => {
     e.preventDefault()
@@ -83,16 +99,17 @@ export default function RowForm({ table, row, onClose }) {
   const setYear = (y) => setForm((f) => {
     const sem = Number(f.Semester)
     const ok = y && sem && Math.ceil(sem / perYear) === Number(y)
-    return { ...f, Year: y, Semester: ok ? f.Semester : '', ...(!ok && !other ? { SubjectCode: '', SubjectName: '' } : {}) }
+    return { ...f, Year: y, Semester: ok ? f.Semester : '', ...(isSubjects && !ok && !other ? { SubjectCode: '', SubjectName: '' } : {}) }
   })
   const taken = new Set(db.Subjects.filter((r) => r._id !== row?._id && r.BranchCode === form.BranchCode).map((r) => r.SubjectCode))
   // Branch + Year is enough to list subjects: the year's semesters are offered, grouped, and
   // picking one fills the semester. A chosen semester narrows the list to just that semester.
   const pickedYear = Number(preview.Year)
-  const catalogOptions = isSubjects && form.BranchCode && (form.Semester || pickedYear)
-    ? subjectPool.filter((s) => (s.BranchCode === form.BranchCode || s.BranchCode === 'ALL') && !taken.has(s.SubjectCode) &&
+  const catalogListed = isSubjects && form.BranchCode && (form.Semester || pickedYear)
+    ? subjectPool.filter((s) => (s.BranchCode === form.BranchCode || s.BranchCode === 'ALL') &&
         (form.Semester ? Number(s.Semester) === Number(form.Semester) : Math.ceil(Number(s.Semester) / perYear) === pickedYear))
     : []
+  const catalogOptions = catalogListed.filter((s) => !taken.has(s.SubjectCode))
   const catalogGroups = []
   for (const s of catalogOptions) {
     const label = `Semester ${s.Semester} · ${s.Elective ? 'Electives' : 'Core'}`
@@ -110,18 +127,35 @@ export default function RowForm({ table, row, onClose }) {
 
   const OTHER = '__other__'
 
-  // Branches: pick from the catalog (fills name, degree, years, semesters) or type your own.
+  // Branches: degree first (fills years / semesters), then one of that degree's branches, or type your own.
   const takenBranches = new Set(db.Branches.filter((r) => r._id !== row?._id).map((r) => r.BranchCode))
-  const branchOptions = branchCatalog.filter((x) => !takenBranches.has(x.BranchCode))
+  const degree = DEGREES.get(form.Degree)
+  const branchOptions = branchesOf(degree).filter((x) => !takenBranches.has(x.BranchCode))
+  const pickDegree = (v) => {
+    setOtherBranch(v === OTHER)
+    if (v === OTHER) { setOtherDegree(true); setForm((f) => ({ ...f, Degree: '', BranchCode: '', BranchName: '' })); return }
+    const d = DEGREES.get(v)
+    const options = branchesOf(d).filter((x) => !takenBranches.has(x.BranchCode))
+    // a degree without branches has just one option, so it is picked straight away
+    const only = d && !d.Branches.length && options.length === 1 ? options[0] : { BranchCode: '', BranchName: '' }
+    setForm((f) => ({ ...f, Degree: v, ...(d ? { TotalYears: d.TotalYears, SemestersPerYear: d.SemestersPerYear } : {}), ...only }))
+  }
   const pickBranch = (code) => {
     if (code === OTHER) { setOtherBranch(true); setForm((f) => ({ ...f, BranchCode: '', BranchName: '' })); return }
     const x = branchOptions.find((y) => y.BranchCode === code)
-    setForm((f) => (x ? { ...f, ...x } : { ...f, BranchCode: '', BranchName: '' }))
+    // a branch may run longer or shorter than its degree's usual length (e.g. 4-year paramedical B.Sc)
+    const years = x?.TotalYears ?? degree?.TotalYears
+    setForm((f) => ({ ...f, BranchCode: x?.BranchCode ?? '', BranchName: x?.BranchName ?? '', ...(years ? { TotalYears: years } : {}) }))
   }
 
   // Subjects are entered top-down: branch, year, semester, then the subject itself.
   const SUBJECT_ORDER = ['BranchCode', 'Year', 'Semester', 'SubjectName', 'SubjectCode']
   const ROOM_ORDER = ['Building', 'Floor', 'RoomNo', 'RoomID']
+  const SECTION_ORDER = ['BranchCode', 'Year', 'Semester', 'Section', 'Strength', 'SectionID']
+  // section letters already used for this branch + semester
+  const takenSections = new Set(db.Sections.filter((r) => r._id !== row?._id && r.BranchCode === form.BranchCode && Number(r.Semester) === Number(form.Semester)).map((r) => r.Section))
+  // Branch dropdowns (Sections, Subjects, Teachers) are grouped by degree and show the branch name
+  const branchGroups = [...new Set(db.Branches.map((b) => b.Degree || 'Other'))].map((deg) => ({ deg, items: db.Branches.filter((b) => (b.Degree || 'Other') === deg) }))
   const isAssign = table === 'TeacherSubjectMap'
   const ASSIGN_ORDER = ['SectionID', 'SubjectCode', 'TeacherID']
   // teachers who asked for the chosen subject, best claim first (priority, fit score, load share)
@@ -130,6 +164,8 @@ export default function RowForm({ table, row, onClose }) {
     ? [...ASSIGN_ORDER.map((k) => t.columns.find((c) => c.key === k)), ...t.columns.filter((c) => !ASSIGN_ORDER.includes(c.key))]
     : isRooms
     ? [...ROOM_ORDER.map((k) => t.columns.find((c) => c.key === k)), ...t.columns.filter((c) => !ROOM_ORDER.includes(c.key))]
+    : isSections
+    ? SECTION_ORDER.map((k) => t.columns.find((c) => c.key === k))
     : isSubjects
     ? [...SUBJECT_ORDER.map((k) => t.columns.find((c) => c.key === k)), ...t.columns.filter((c) => !SUBJECT_ORDER.includes(c.key))]
     : t.columns
@@ -144,6 +180,9 @@ export default function RowForm({ table, row, onClose }) {
     if (c.key === 'SubjectCode' && table === 'TeacherSubjectMap' && form.SectionID) {
       const sec = db.Sections.find((x) => x.SectionID === form.SectionID)
       if (sec) rows = rows.filter((s) => s.BranchCode === sec.BranchCode && Number(s.Semester) === Number(sec.Semester))
+      // a subject already given to this section drops out of the list
+      const assigned = new Set(db.TeacherSubjectMap.filter((a) => a._id !== row?._id && a.SectionID === form.SectionID).map((a) => a.SubjectCode))
+      rows = rows.filter((s) => !assigned.has(s.SubjectCode) || s.SubjectCode === form.SubjectCode)
     }
     return rows
   }
@@ -159,25 +198,42 @@ export default function RowForm({ table, row, onClose }) {
         <div className="fields">
           {formColumns.map((c) => {
             const val = preview[c.key] ?? ''
-            if (isSubjects && c.key === 'Year') {
+            if ((isSubjects || isSections) && c.key === 'Year') {
               return (
                 <label key={c.key} className="field">
                   <span>Year</span>
-                  <select value={val} onChange={(e) => setYear(e.target.value)}>
-                    <option value="">Select…</option>
+                  <select value={val} disabled={isSections && !form.BranchCode} onChange={(e) => setYear(e.target.value)}>
+                    <option value="">{isSections && !form.BranchCode ? 'Pick a branch first' : 'Select…'}</option>
                     {Array.from({ length: yearCount }, (_, i) => i + 1).map((y) => <option key={y} value={y}>Year {y}</option>)}
                   </select>
                 </label>
               )
             }
-            if (isSubjects && c.key === 'Semester') {
+            if ((isSubjects || isSections) && c.key === 'Semester') {
               return (
                 <label key={c.key} className="field">
                   <span>{c.label}<b> *</b></span>
-                  <select value={val} onChange={(e) => set(c.key, e.target.value)}>
-                    <option value="">Select…</option>
+                  <select value={val} disabled={isSections && !form.BranchCode} onChange={(e) => set(c.key, e.target.value)}>
+                    <option value="">{isSections && !form.BranchCode ? 'Pick a branch first' : 'Select…'}</option>
                     {semesterOptions().map((n) => <option key={n} value={n}>Semester {n}</option>)}
                   </select>
+                </label>
+              )
+            }
+            if (isSections && c.key === 'Section') {
+              return (
+                <label key={c.key} className="field">
+                  <span>Section<b> *</b></span>
+                  {otherSection ? (
+                    <input value={val} placeholder="e.g. K" onChange={(e) => set(c.key, e.target.value.toUpperCase())} />
+                  ) : (
+                    <select value={val} onChange={(e) => (e.target.value === OTHER ? (setOtherSection(true), set(c.key, '')) : set(c.key, e.target.value))}>
+                      <option value="">Select…</option>
+                      {SECTION_LETTERS.filter((s) => !takenSections.has(s) || s === val).map((s) => <option key={s} value={s}>{s}</option>)}
+                      <option value={OTHER}>Other (enter manually)</option>
+                    </select>
+                  )}
+                  {otherSection && <button type="button" className="link" onClick={() => { setOtherSection(false); set(c.key, '') }}>← Choose from the list instead</button>}
                 </label>
               )
             }
@@ -185,11 +241,15 @@ export default function RowForm({ table, row, onClose }) {
               const ready = form.BranchCode && (form.Semester || pickedYear)
               const isCode = c.key === 'SubjectCode'
               const picked = form.SubjectCode
+              const scope = form.Semester ? `semester ${form.Semester}` : `year ${pickedYear}`
+              // nothing listed = IUL publishes no timetabled subjects there (new batch, project-only
+              // semester, or a branch IUL doesn't run); everything listed may also be added already
+              const empty = !catalogListed.length ? `No IUL subjects for ${form.BranchCode} ${scope} — use Other` : 'All listed subjects added — use Other'
               return (
                 <label key={c.key} className="field">
                   <span>{c.label}<b> *</b></span>
                   <select value={picked} disabled={!ready} onChange={(e) => pickCatalog(e.target.value)}>
-                    <option value="">{!ready ? 'Pick branch & year first' : catalogOptions.length ? 'Select…' : 'All listed subjects added — use Other'}</option>
+                    <option value="">{!ready ? 'Pick branch & year first' : catalogOptions.length ? 'Select…' : empty}</option>
                     {picked && !catalogOptions.some((s) => s.SubjectCode === picked) && <option value={picked}>{isCode ? picked : form.SubjectName}</option>}
                     {catalogGroups.map((g) => (
                       <optgroup key={g.label} label={g.label}>
@@ -198,7 +258,9 @@ export default function RowForm({ table, row, onClose }) {
                     ))}
                     <option value={OTHER}>Other (enter manually)</option>
                   </select>
-                  {isCode && ready && <small className="sub">{catalogOptions.length} subject{catalogOptions.length === 1 ? '' : 's'} left to add for {form.Semester ? `semester ${form.Semester}` : `year ${pickedYear}`}</small>}
+                  {isCode && ready && <small className="sub">{catalogListed.length
+                    ? `${catalogOptions.length} subject${catalogOptions.length === 1 ? '' : 's'} left to add for ${scope}`
+                    : `IUL's syllabus lists no timetabled subjects for ${form.BranchCode} ${scope}. Pick Other to type one in.`}</small>}
                 </label>
               )
             }
@@ -214,7 +276,7 @@ export default function RowForm({ table, row, onClose }) {
                       <optgroup label="Asked for this subject — best claim first">
                         {ranked.map((r, i) => (
                           <option key={r.teacher._id} value={r.teacher.TeacherID}>
-                            {i + 1}. {r.teacher.TeacherID} — {r.teacher.Name} · priority {r.priority === 9 ? '–' : r.priority} · fit {r.fit} · {r.years} yrs · taught {r.taught}× · {r.papers} papers · load {r.load}/{r.max}h
+                            {i + 1}. {r.teacher.TeacherID} — {r.teacher.Name} · priority {r.priority === 9 ? '–' : r.priority} · {r.years} yrs · {r.held} sections held · load {r.load}/{r.max}h
                           </option>
                         ))}
                       </optgroup>
@@ -273,18 +335,40 @@ export default function RowForm({ table, row, onClose }) {
                 </label>
               )
             }
+            if (isBranches && c.key === 'Degree') {
+              return (
+                <label key={c.key} className="field">
+                  <span>Degree<b> *</b></span>
+                  {otherDegree ? (
+                    <input value={val} placeholder="e.g. B.Voc" onChange={(e) => set(c.key, e.target.value)} />
+                  ) : (
+                    <select value={val} onChange={(e) => pickDegree(e.target.value)}>
+                      <option value="">Select…</option>
+                      {DEGREE_LEVELS.map((level) => (
+                        <optgroup key={level} label={level}>
+                          {degreeCatalog.filter((d) => d.Level === level).map((d) => <option key={d.Degree} value={d.Degree}>{d.Degree} — {d.Name}</option>)}
+                        </optgroup>
+                      ))}
+                      <option value={OTHER}>Other (enter manually)</option>
+                    </select>
+                  )}
+                  {otherDegree && <button type="button" className="link" onClick={() => { setOtherDegree(false); setOtherBranch(false); setForm((f) => ({ ...f, Degree: '', BranchCode: '', BranchName: '' })) }}>← Choose from the list instead</button>}
+                </label>
+              )
+            }
             if (isBranches && !otherBranch && (c.key === 'BranchCode' || c.key === 'BranchName')) {
               const isCode = c.key === 'BranchCode'
               const picked = form.BranchCode
               return (
                 <label key={c.key} className="field">
                   <span>{c.label}<b> *</b></span>
-                  <select value={picked} onChange={(e) => pickBranch(e.target.value)}>
-                    <option value="">Select…</option>
+                  <select value={picked} disabled={!degree} onChange={(e) => pickBranch(e.target.value)}>
+                    <option value="">{!degree ? 'Pick a degree first' : branchOptions.length ? 'Select…' : `All ${form.Degree} branches added — use Other`}</option>
                     {picked && !branchOptions.some((x) => x.BranchCode === picked) && <option value={picked}>{isCode ? picked : form.BranchName}</option>}
-                    {branchOptions.map((x) => <option key={x.BranchCode} value={x.BranchCode}>{isCode ? x.BranchCode : x.BranchName}</option>)}
+                    {branchOptions.map((x) => <option key={x.BranchCode} value={x.BranchCode}>{isCode ? `${x.BranchCode} — ${x.BranchName}` : x.BranchName}</option>)}
                     <option value={OTHER}>Other (enter manually)</option>
                   </select>
+                  {isCode && degree && <small className="sub">{branchOptions.length} {form.Degree} branch{branchOptions.length === 1 ? '' : 'es'} left to add</small>}
                 </label>
               )
             }
@@ -302,6 +386,17 @@ export default function RowForm({ table, row, onClose }) {
                 <select value={val} disabled={editing && c.lockOnEdit} onChange={(e) => set(c.key, e.target.value)}>
                   <option value="">Select…</option>
                   {c.options.map((o) => <option key={o} value={o}>{o}</option>)}
+                </select>
+              )
+            } else if (c.type === 'ref' && c.ref === 'Branches') {
+              input = (
+                <select value={val} onChange={(e) => set(c.key, e.target.value)}>
+                  <option value="">{db.Branches.length ? 'Select…' : 'Add branches first'}</option>
+                  {branchGroups.map((g) => (
+                    <optgroup key={g.deg} label={g.deg}>
+                      {g.items.map((b) => <option key={b._id} value={b.BranchCode}>{b.BranchCode} — {b.BranchName}</option>)}
+                    </optgroup>
+                  ))}
                 </select>
               )
             } else if (c.type === 'ref') {
@@ -328,7 +423,7 @@ export default function RowForm({ table, row, onClose }) {
               <label key={c.key} className="field">
                 <span>{c.label}{c.required && <b> *</b>}</span>
                 {input}
-                {isBranches && otherBranch && c.key === 'BranchName' && (
+                {isBranches && otherBranch && !otherDegree && c.key === 'BranchName' && (
                   <button type="button" className="link" onClick={() => { setOtherBranch(false); setForm((f) => ({ ...f, BranchCode: '', BranchName: '' })) }}>← Choose from the list instead</button>
                 )}
                 {isSubjects && other && c.key === 'SubjectName' && (
@@ -361,13 +456,11 @@ export default function RowForm({ table, row, onClose }) {
                     </select>
                   </label>
                   <label className="field"><span>Experience (yrs)</span><input type="number" min={0} max={60} value={p.ExperienceYears} onChange={(e) => setPref(i, { ExperienceYears: e.target.value })} /></label>
-                  <label className="field"><span>Times taught</span><input type="number" min={0} max={100} value={p.TimesTaught} onChange={(e) => setPref(i, { TimesTaught: e.target.value })} /></label>
-                  <label className="field"><span>Research papers</span><input type="number" min={0} max={1000} value={p.ResearchPapers} onChange={(e) => setPref(i, { ResearchPapers: e.target.value })} /></label>
                   <button type="button" className="link danger" onClick={() => setPrefs((l) => l.filter((_, j) => j !== i))}>Remove</button>
                 </div>
               )
             })}
-            <button type="button" className="btn sm" onClick={() => setPrefs((l) => [...l, { SubjectCode: '', Priority: '', ExperienceYears: '', TimesTaught: '', ResearchPapers: '' }])}>+ Add subject preference</button>
+            <button type="button" className="btn sm" onClick={() => setPrefs((l) => [...l, { SubjectCode: '', Priority: '', ExperienceYears: '' }])}>+ Add subject preference</button>
             {!form.BranchCode && <p className="sub">Pick the teacher's branch first to see its subjects.</p>}
           </div>
         )}

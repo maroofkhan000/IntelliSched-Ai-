@@ -56,7 +56,7 @@ export default function DbManager() {
                     {d.id === activeDb.id && <span className="badge approved">active</span>}
                     {isAdmin && <button className="btn sm" onClick={() => { const n = window.prompt('Rename database', d.name); if (n) renameDatabase(d.id, n) }}>Rename</button>}
                     {isAdmin && databases.length > 1 && (
-                      <button className="btn sm danger" onClick={() => window.confirm(`Delete "${d.name}" and all its data?`) && deleteDatabase(d.id)}>Delete</button>
+                      <button className="btn sm danger" onClick={() => deleteDatabase(d.id)}>Delete</button>
                     )}
                   </div>
                 </li>
