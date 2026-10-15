@@ -33,6 +33,21 @@ python -m venv .venv
 .venv\Scripts\python -m intellisched train
 ```
 
+### Data straight from the app
+
+```powershell
+# the app's database, read through the running backend (GET only), solved 40 times
+.venv\Scripts\python -m intellisched live --n 40 --time 15
+
+# every timetable an admin generates is logged by the backend; fetch them (+ re-solve with CP-SAT)
+.venv\Scripts\python -m intellisched pull --solve 10
+
+# runs/runs.csv -> datasets/solver_runs.csv and .jsonl
+.venv\Scripts\python -m intellisched dataset
+```
+
+The app's **Export for ML (.json)** button gives the same input format; pass it with `run --input file.json`. Dataset columns are described in `datasets/DATASET.md`.
+
 ### GPU
 
 `requirements.txt` installs the CPU build of PyTorch. To train on an NVIDIA GPU, swap it for the CUDA build (any recent driver; checked on an RTX 3050 Laptop, 4 GB):

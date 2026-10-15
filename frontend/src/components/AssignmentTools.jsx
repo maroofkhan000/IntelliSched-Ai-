@@ -88,7 +88,7 @@ export default function AssignmentTools() {
               <h3>Auto-assign by preference</h3>
               <button className="icon-btn" onClick={() => setAuto(null)} aria-label="Close">✕</button>
             </header>
-            <p className="muted">Fills only the section-subject pairs that have no teacher yet. Existing assignments are kept and count toward each teacher's weekly load. Nothing is saved until you press Apply.</p>
+            <p className="muted">Generating a timetable does this automatically for its term and branch, so you only need it to preview or to assign ahead of time. Fills only the section-subject pairs that have no teacher yet. Existing assignments are kept and count toward each teacher's weekly load. Nothing is saved until you press Apply.</p>
             <div className="gen-controls">
               <label className="field"><span>Semesters</span>
                 <select value={auto.scope.term} onChange={(e) => setScope({ term: e.target.value })}>{Object.entries(TERMS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>

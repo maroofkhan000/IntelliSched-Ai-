@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Tilt from '../components/Tilt'
-import { exportWorkbook, parseWorkbook } from '../excel'
+import { exportJson, exportWorkbook, parseWorkbook } from '../excel'
 import { computeHealth } from '../health'
 import { TABLES, TABLE_ORDER } from '../schema'
 import { useStore } from '../store'
@@ -9,7 +9,7 @@ import { useStore } from '../store'
 const SETUP = ['Branches', 'TimeSlots', 'Rooms', 'Subjects', 'Sections', 'Teachers', 'TeacherSubjectMap']
 
 export default function Overview() {
-  const { db, isAdmin, importRows, clearAll, activeDb } = useStore()
+  const { db, settings, isAdmin, importRows, clearAll, activeDb } = useStore()
   const fileRef = useRef(null)
   const [msg, setMsg] = useState('')
   const [busy, setBusy] = useState(false)
@@ -63,6 +63,7 @@ export default function Overview() {
         </div>
         <div className="head-actions">
           <button className="btn primary" onClick={() => exportWorkbook(db, { name: activeDb.name })} disabled={!total}>⬇ Export full database (.xlsx)</button>
+          <button className="btn" onClick={() => exportJson(db, settings, { name: activeDb.name })} disabled={!total} title="Same data with settings and number types kept — the input format for the ML pipeline">⬇ Export for ML (.json)</button>
         </div>
       </div>
 

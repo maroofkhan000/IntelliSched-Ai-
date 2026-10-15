@@ -28,7 +28,7 @@ export default function Timetable() {
     setBusy(false)
     if (res.error) return setMsg({ text: res.error, bad: true })
     const s = res.timetable.stats
-    setMsg({ text: `Placed ${s.scheduled} of ${s.demand} weekly periods for ${s.sections} sections.`, bad: false })
+    setMsg({ text: `${res.autoAssigned ? `Auto-assigned teachers to ${res.autoAssigned} section-subject pair${res.autoAssigned === 1 ? '' : 's'}. ` : ''}Placed ${s.scheduled} of ${s.demand} weekly periods for ${s.sections} sections.`, bad: false })
     setPick('')
   }
 

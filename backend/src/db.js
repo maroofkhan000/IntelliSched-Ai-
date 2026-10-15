@@ -5,7 +5,7 @@ import { MongoClient } from 'mongodb'
 import { TABLE_ORDER, defaultSettings } from './schema.js'
 
 let client
-export let users, databases, rows, attempts
+export let users, databases, rows, attempts, mlruns
 
 export async function connect() {
   client = new MongoClient(process.env.MONGODB_URI)
@@ -25,9 +25,11 @@ export async function connect() {
   databases = db.collection('databases')
   rows = db.collection('rows')
   attempts = db.collection('attempts')
+  mlruns = db.collection('mlruns') // one record per generated timetable: training data for ml/
   await users.createIndex({ username: 1 }, { unique: true })
   await rows.createIndex({ dbId: 1, table: 1 })
   await attempts.createIndex({ expireAt: 1 }, { expireAfterSeconds: 0 })
+  await mlruns.createIndex({ dbId: 1, at: 1 })
   await seed()
 }
 

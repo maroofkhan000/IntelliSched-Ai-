@@ -97,6 +97,18 @@ export async function exportWorkbook(db, { onlyApproved = true, name = 'timetabl
   saveAs(new Blob([await wb.xlsx.writeBuffer()]), `${name.replace(/[^\w\- ]+/g, '').trim() || 'timetable_database'}.xlsx`)
 }
 
+// Whole database -> one JSON file for the ML pipeline (ml/: `run --input file.json`). Unlike the
+// workbook it keeps types (numbers stay numbers), the General Settings (days, periods, open
+// cells, timings) and each row's review status, so nothing is lost in the hand-over.
+export function exportJson(db, settings, { onlyApproved = true, name = 'timetable_database' } = {}) {
+  const value = (c, v) => (v === '' || v == null ? null : (c.type === 'number' || c.numeric) && !Number.isNaN(Number(v)) ? Number(v) : v)
+  const tables = Object.fromEntries(TABLE_ORDER.map((t) => [t, db[t]
+    .filter((r) => !onlyApproved || r._status === 'approved')
+    .map((r) => ({ ...Object.fromEntries(TABLES[t].columns.map((c) => [c.key, value(c, r[c.key])])), _status: r._status }))]))
+  const doc = { format: 'intellisched-database', version: 1, name, exportedAt: new Date().toISOString(), onlyApproved, settings, tables }
+  saveAs(new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' }), `${name.replace(/[^\w\- ]+/g, '').trim() || 'timetable_database'}.json`)
+}
+
 export async function exportSheet(name, rows) {
   const wb = new ExcelJS.Workbook()
   styleSheet(wb.addWorksheet(name), name, rows, true)

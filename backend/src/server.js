@@ -156,7 +156,37 @@ app.put('/api/databases/:id/timetable', adminOnly, withDb, wrap(async (req, res)
   const t = req.body?.timetable
   if (t !== null && !(t && Array.isArray(t.entries) && Array.isArray(t.unscheduled))) return fail(res, 400, 'Invalid timetable.')
   await store.databases.updateOne({ _id: req.dbDoc._id }, t === null ? { $unset: { timetable: '' } } : { $set: { timetable: t } })
+  if (t) await logMlRun(req, t)
   res.json({ ok: true })
+}))
+
+// Every generated timetable becomes one training record for the ML pipeline (ml/: `pull`):
+// what the admin asked for, the numbers that describe the problem (sent by the app, see
+// frontend/src/mlRecord.js), how it turned out, and a snapshot of the approved input so the
+// offline solver can re-solve exactly the same problem. A failure here never blocks the save.
+const logMlRun = async (req, t) => {
+  try {
+    const data = await store.loadData(req.dbDoc._id)
+    const approved = Object.fromEntries(TABLE_ORDER.map((n) => [n, data[n].filter((r) => r._status === 'approved').map(({ _id, _by, _at, ...r }) => r)]))
+    await store.mlruns.insertOne({
+      _id: randomUUID(), dbId: req.dbDoc._id, dbName: req.dbDoc.name, at: new Date(), by: req.user.username,
+      source: 'app-greedy', scope: t.scope ?? {}, features: req.body?.ml?.features ?? {}, autoAssigned: req.body?.ml?.autoAssigned ?? 0,
+      outcome: { ...t.stats, timings: undefined, unscheduledReasons: countBy(t.unscheduled ?? [], (u) => u.reason) },
+      snapshot: { settings: { ...defaultSettings(), ...req.dbDoc.settings }, tables: approved },
+    })
+  } catch (e) {
+    console.error('ml run log failed:', e.message)
+  }
+}
+const countBy = (list, key) => list.reduce((m, x) => ({ ...m, [key(x)]: (m[key(x)] ?? 0) + 1 }), {})
+
+// The ML records as JSON Lines (admin only). ?snapshot=1 includes each run's input data.
+app.get('/api/ml/runs', adminOnly, wrap(async (req, res) => {
+  const withSnap = req.query.snapshot === '1'
+  const filter = req.query.db ? { dbId: String(req.query.db) } : {}
+  res.type('application/x-ndjson')
+  for await (const r of store.mlruns.find(filter, withSnap ? {} : { projection: { snapshot: 0 } }).sort({ at: 1 })) res.write(`${JSON.stringify(r)}\n`)
+  res.end()
 }))
 
 // Validate + shape one row for a table (derived and generated columns included).
@@ -231,6 +261,21 @@ app.post('/api/databases/:id/teachers', withDb, wrap(async (req, res) => {
   res.json({ teacher: store.toRow(teacherDoc), preferences: now.map(store.toRow) })
 }))
 
+// A branch can't be deleted while sections, subjects or teachers still belong to it: they would be
+// left pointing at a branch that no longer exists. Sends the error itself and returns false.
+const branchesFree = async (req, res, filter) => {
+  if (req.params.table !== 'Branches') return true
+  const codes = (await store.rows.find(filter).toArray()).map((b) => b.BranchCode)
+  const using = []
+  for (const t of ['Sections', 'Subjects', 'Teachers']) {
+    const n = await store.rows.countDocuments({ dbId: req.dbDoc._id, table: t, BranchCode: { $in: codes } })
+    if (n) using.push(`${n} ${TABLES[t].label.toLowerCase()}`)
+  }
+  if (!using.length) return true
+  fail(res, 409, `Can't delete ${codes.length === 1 ? `branch ${codes[0]}` : `these ${codes.length} branches`}: ${using.join(', ')} still belong to ${codes.length === 1 ? 'it' : 'them'}. Delete or move those first.`)
+  return false
+}
+
 app.post('/api/databases/:id/tables/:table/rows/delete', withDb, withTable, wrap(async (req, res) => {
   const ids = Array.isArray(req.body?.ids) ? req.body.ids : []
   const filter = { dbId: req.dbDoc._id, table: req.params.table, _id: { $in: ids } }
@@ -238,6 +283,7 @@ app.post('/api/databases/:id/tables/:table/rows/delete', withDb, withTable, wrap
   const count = await store.rows.countDocuments(filter)
   const whole = count === (await store.rows.countDocuments({ dbId: req.dbDoc._id, table: req.params.table }))
   // a feeder can only reach their own pending rows, so they never need (or get to test) the admin password
+  if (!(await branchesFree(req, res, filter))) return
   if (req.user.role === 'admin' && !(await adminPasswordOk(req, res, count, whole))) return
   const gone = req.params.table === 'Teachers' ? (await store.rows.find(filter).toArray()).map((t) => t.TeacherID) : []
   const r = await store.rows.deleteMany(filter)
@@ -253,6 +299,7 @@ app.post('/api/databases/:id/tables/:table/status', adminOnly, withDb, withTable
   const tids = req.params.table === 'Teachers' ? (await store.rows.find(filter).toArray()).map((t) => t.TeacherID) : []
   const prefFilter = { dbId: req.dbDoc._id, table: 'TeacherPreferences', TeacherID: { $in: tids } }
   if (status === 'rejected') {
+    if (!(await branchesFree(req, res, filter))) return
     const count = await store.rows.countDocuments(filter)
     const whole = count === (await store.rows.countDocuments({ dbId: req.dbDoc._id, table: req.params.table }))
     if (!(await adminPasswordOk(req, res, count, whole))) return

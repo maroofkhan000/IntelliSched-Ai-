@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { api, getToken, setToken } from './api'
+import { suggestAssignments } from './assigner'
 import { generateTimetable as buildTimetable } from './generator'
+import { problemFeatures } from './mlRecord'
 import { TABLES, TABLE_ORDER, WEEK, defaultSettings, effectiveTimings } from './schema'
 
 const ACTIVE_KEY = 'intellisched.active.v1' // remembers which database you had open
@@ -202,6 +204,11 @@ export function StoreProvider({ children }) {
   }, [active?.id, guard, refreshList])
 
   const deleteRows = useCallback((table, ids) => guard(async () => {
+    if (table === 'Branches') { // same rule as the server: a branch in use can't be deleted
+      const codes = new Set(active.data.Branches.filter((b) => ids.includes(b._id)).map((b) => b.BranchCode))
+      const using = ['Sections', 'Subjects', 'Teachers'].map((t) => [t, active.data[t].filter((r) => codes.has(r.BranchCode)).length]).filter(([, n]) => n)
+      if (using.length) throw new Error(`Can't delete ${codes.size === 1 ? `branch ${[...codes][0]}` : `these ${codes.size} branches`}: ${using.map(([t, n]) => `${n} ${TABLES[t].label.toLowerCase()}`).join(', ')} still belong to ${codes.size === 1 ? 'it' : 'them'}. Delete or move those first.`)
+    }
     const whole = ids.length === (active.data[table] ?? []).length
     await confirmThen(
       {
@@ -254,19 +261,32 @@ export function StoreProvider({ children }) {
 
   // ---------- timetable ----------
   // Builds a timetable from the current database + General Settings and saves it.
-  // Resolves to { error } or { timetable }.
+  // Teaching assignments are automatic: every section-subject pair in scope without a teacher
+  // gets one first (Auto-assign rules, falling back to the least-loaded teacher of the branch),
+  // and those assignments are saved. Assignments already in the table are kept, so manual
+  // choices still win. The save also logs a training record for the ML pipeline.
+  // Resolves to { error } or { timetable, autoAssigned }.
   const generateTimetable = useCallback(async (scope) => {
     await flushSettings()
-    const result = buildTimetable({ db, settings, scope })
-    if (result.error) return result
     try {
-      await api(`/databases/${active.id}/timetable`, { method: 'PUT', body: { timetable: result } })
+      let data = db
+      const auto = suggestAssignments({ db, scope, fallback: true }).assignments
+      if (auto.length) {
+        const rows = auto.map(({ TeacherID, SubjectCode, SectionID }) => ({ TeacherID, SubjectCode, SectionID }))
+        data = { ...emptyDb(), ...(await api(`/databases/${active.id}/import`, { method: 'POST', body: { data: { TeacherSubjectMap: rows } } })).data }
+        setActive((a) => ({ ...a, data }))
+        refreshList()
+      }
+      const result = buildTimetable({ db: data, settings, scope })
+      if (result.error) return result
+      const ml = { features: problemFeatures(data, settings, scope), autoAssigned: auto.length }
+      await api(`/databases/${active.id}/timetable`, { method: 'PUT', body: { timetable: result, ml } })
       setActive((a) => ({ ...a, timetable: result }))
-      return { timetable: result }
+      return { timetable: result, autoAssigned: auto.length }
     } catch (e) {
       return { error: e.message }
     }
-  }, [db, settings, active?.id, flushSettings])
+  }, [db, settings, active?.id, flushSettings, refreshList])
 
   const clearTimetable = useCallback(() => guard(async () => {
     await confirmThen({ title: 'Clear timetable', message: 'Delete the generated timetable? Your tables are kept, so you can generate it again.', confirmLabel: 'Clear timetable' }, () => api(`/databases/${active.id}/timetable`, { method: 'PUT', body: { timetable: null } }))

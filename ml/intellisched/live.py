@@ -100,6 +100,10 @@ def auto_assign(data):
     return len(added)
 
 
+def _app_columns(table):
+    return [{"key": c} for c in columns(table)]
+
+
 def export_live(database=None):
     """Read one database from the API (GET only) -> data/live/<name>.xlsx. Returns (path, summary)."""
     env = _env()
@@ -123,11 +127,33 @@ def export_live(database=None):
                 df[c] = None
         data[t] = df[columns(t)]
         counts[t] = f"{len(rows)}/{len(d['data'].get(t, []))}"
-    assigned = auto_assign(data)
     name = re.sub(r"[^A-Za-z0-9]+", "_", d["name"]).strip("_").lower() or "live"
+    # the untouched data, in the same format as the app's "Export for ML (.json)" button
+    keep = {t: [{c: r.get(c) for c in [col["key"] for col in _app_columns(t)]} | {"_status": r["_status"]}
+                for r in d["data"].get(t, []) if r.get("_status") == "approved"] for t in TABLE_ORDER}
+    raw = ROOT / "data" / "live" / f"{name}.json"
+    raw.parent.mkdir(parents=True, exist_ok=True)
+    raw.write_text(json.dumps({"format": "intellisched-database", "version": 1, "name": d["name"], "onlyApproved": True,
+                               "settings": d["settings"], "tables": keep}, indent=2), encoding="utf8")
+    assigned = auto_assign(data)
     path = save_workbook(data, ROOT / "data" / "live" / f"{name}.xlsx")
     return path, {"database": d["name"], "approved/total": counts, "auto-assigned in memory": assigned,
                   "terms": sorted({"odd" if int(_num(s)) % 2 else "even" for s in data["Sections"].Semester if _num(s)})}
+
+
+def solve_variants(path, n, time_limit, terms, name, seed=0):
+    """Solve one workbook n times (terms in turn): default weights first, then random ones -> runs/runs.csv."""
+    rng = np.random.default_rng(seed)
+    rows = []
+    for k in range(n):
+        term = terms[k % len(terms)]
+        weights = None if k < len(terms) else {
+            key: (v if key == "unplaced" else max(0, round(v * math.exp(rng.normal(0, 0.8)), 1))) for key, v in DEFAULT_WEIGHTS.items()}
+        _, row = run(path, term=term, weights=weights, time_limit=time_limit, name=f"{name}_{term or 'all'}", quiet=True, charts=False)
+        rows.append(row)
+        print(f"  {k + 1}/{n} {term or 'all'}: {row['n_sessions']} sessions -> {row['status']}, unplaced {row.get('unplaced_sessions')}, "
+              f"{row['solve_seconds']}s")
+    return pd.DataFrame(rows)
 
 
 def live_batch(n=40, time_limit=15, database=None, seed=0):
@@ -136,15 +162,4 @@ def live_batch(n=40, time_limit=15, database=None, seed=0):
     print(f"read '{info['database']}' (approved/total rows): " + ", ".join(f"{t} {c}" for t, c in info["approved/total"].items()))
     print(f"teaching assignments filled in memory by Auto-assign rules: {info['auto-assigned in memory']}; terms with sections: {', '.join(terms)}")
     print(f"saved {path.relative_to(ROOT)}; solving it {n} times with random weights")
-    rng = np.random.default_rng(seed)
-    rows = []
-    for k in range(n):
-        term = terms[k % len(terms)]
-        # the first solve of each term uses the default weights, the rest are random around them
-        weights = None if k < len(terms) else {
-            key: (v if key == "unplaced" else max(0, round(v * math.exp(rng.normal(0, 0.8)), 1))) for key, v in DEFAULT_WEIGHTS.items()}
-        _, row = run(path, term=term, weights=weights, time_limit=time_limit, name=f"live_{path.stem}_{term}", quiet=True, charts=False)
-        rows.append(row)
-        print(f"  {k + 1}/{n} {term}: {row['n_sessions']} sessions -> {row['status']}, unplaced {row.get('unplaced_sessions')}, "
-              f"{row['solve_seconds']}s")
-    return pd.DataFrame(rows)
+    return solve_variants(path, n, time_limit, terms, f"live_{path.stem}", seed)

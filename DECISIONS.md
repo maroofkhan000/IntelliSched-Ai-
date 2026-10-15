@@ -158,6 +158,23 @@ Format per entry: **Context** (the problem), **Decision**, **Why**, **Trade-offs
 - **Why:** It's a repeatable, read-only way to check changes in the real app.
 - **Trade-offs:** It needs Chrome, and Git Bash rewrites `/api/...` arguments into Windows paths; the driver undoes that.
 
+## D19. Teaching assignments are automatic (Oct 2026)
+
+- **Decision:** When the admin presses Generate, every section-subject pair in scope that has no teacher gets one first, and those assignments are saved. The rules are Auto-assign's, with the least-loaded teacher of the branch as a fallback. Assignments already in the table are kept, so manual choices still win.
+- **Why:** An empty Teaching Assignments table was the most common reason nothing could be scheduled.
+- **Trade-offs:** Generating now writes rows. Pairs no teacher can take are still listed as unscheduled ("No teacher assigned").
+
+## D20. A branch in use can't be deleted (Oct 2026)
+
+- **Decision:** Deleting or rejecting a branch is refused while sections, subjects or teachers still use its code. The server checks this (`branchesFree`), and the app checks it before the confirm dialog opens.
+- **Why:** A deleted EEE branch left two sections pointing at nothing.
+
+## D21. The app feeds the ML pipeline (Oct 2026)
+
+- **Decision:** Each saved timetable logs a record in the `mlruns` collection: scope, problem features (`mlRecord.js`), outcome and a snapshot of the approved input. `GET /api/ml/runs` (admin) serves the records as JSONL. `python -m intellisched pull` saves them under `ml/datasets/` and can re-solve each snapshot with CP-SAT. Datasets are stored as CSV and JSONL. The app also has an "Export for ML (.json)" button that keeps number types and settings.
+- **Why:** Training data grows on its own as the app is used, with no manual downloads.
+- **Trade-offs:** Each record stores a snapshot (tens of KB), which adds to the size of the shared MongoDB.
+
 ---
 
 ## Status
@@ -165,8 +182,7 @@ Format per entry: **Context** (the problem), **Decision**, **Why**, **Trade-offs
 | Decisions | State |
 |---|---|
 | D1–D8, D10–D14 | Committed (`6007834` … `08b9335`) |
-| D9, D11 (new order), D15, D16, D17 | Changed on disk on branch `env-logins-and-delete-password`, **not committed** |
-| D18 | Files in `.claude/skills/run-intellisched/`, **not committed** |
+| D9, D11 (new order), D15–D21 | On branch `env-logins-and-delete-password` (pushed, not merged to `main`) |
 
 ## Open questions
 

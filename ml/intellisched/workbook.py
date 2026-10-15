@@ -1,4 +1,5 @@
 """Read and write timetable workbooks (one sheet per table, app sheet names)."""
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -6,13 +7,25 @@ import pandas as pd
 from .schema import TABLE_ORDER, columns
 
 
+def read_json(path):
+    """The app's "Export for ML (.json)" file -> {table: DataFrame} of approved rows (sheets, as from Excel)."""
+    doc = json.loads(Path(path).read_text(encoding="utf8"))
+    if doc.get("format") != "intellisched-database":
+        raise ValueError(f"{path} is not an IntelliSched database export")
+    return {t: pd.DataFrame([{k: v for k, v in r.items() if k != "_status"} for r in rows if r.get("_status", "approved") == "approved"], dtype=object)
+            for t, rows in doc["tables"].items()}
+
+
 def load_workbook(path):
-    """Workbook -> {table: DataFrame}. Missing sheets become empty frames, missing columns NaN.
+    """Workbook (.xlsx) or the app's JSON export -> {table: DataFrame}. Missing sheets become empty frames, missing columns NaN.
 
     Every value is read as text first (object dtype) so the cleaning step sees exactly what was
     typed — ' cse', '60', 'sixty' — and decides what to do with it.
     """
-    sheets = pd.read_excel(path, sheet_name=None, dtype=object)
+    if Path(path).suffix.lower() == ".json":
+        sheets = read_json(path)
+    else:
+        sheets = pd.read_excel(path, sheet_name=None, dtype=object)
     data = {}
     for name in TABLE_ORDER:
         df = sheets.get(name, pd.DataFrame())
