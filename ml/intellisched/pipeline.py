@@ -49,10 +49,15 @@ def run(input_path=None, term="odd", branches=None, gen=None, weights=None, time
         input_path, _, injected = generate_to_file(gen, ROOT / "data" / "synthetic" / f"{name}.xlsx")
         say(f"[1/5] generated {input_path.relative_to(ROOT)}  ({len(injected)} injected errors)")
     else:
-        try:
-            injected = pd.read_excel(input_path, sheet_name="_Injected")
-        except ValueError:
-            injected = None
+        input_path = Path(input_path)
+        if not input_path.exists():
+            near = sorted(p.name for p in input_path.parent.glob(f"{input_path.stem.split(' (')[0]}*")) if input_path.parent.exists() else []
+            raise SystemExit(f"Input file not found: {input_path}" + (f"\nFiles with that name in {input_path.parent}: {', '.join(near)}" if near else ""))
+        if input_path.suffix.lower() in (".xlsx", ".xlsm"):  # only generated workbooks carry the _Injected ground truth
+            try:
+                injected = pd.read_excel(input_path, sheet_name="_Injected")
+            except ValueError:
+                injected = None
         say(f"[1/5] loaded {input_path}")
     raw = load_workbook(input_path)
 
