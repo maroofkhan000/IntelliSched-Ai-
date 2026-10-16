@@ -8,7 +8,7 @@ import { useStore } from '../store'
 export default function AssignmentTools() {
   const { db, isAdmin, importRows } = useStore()
   const [subject, setSubject] = useState('')
-  const [auto, setAuto] = useState(null) // null | { scope, fallback, result }
+  const [auto, setAuto] = useState(null) // null | { scope, fallback } while the dialog is open
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState({ text: '', bad: false })
 
@@ -20,12 +20,12 @@ export default function AssignmentTools() {
   const counts = useMemo(() => sectionCounts(db), [db])
   const ranked = code ? rankTeachers(db, code, loads, counts) : []
 
-  const openAuto = () => setAuto({ scope: { term: 'all', branch: '' }, fallback: false, result: null })
-  const preview = () => setAuto((a) => ({ ...a, result: suggestAssignments({ db, scope: a.scope, fallback: a.fallback }) }))
+  // same defaults as Generate (which auto-assigns with the fallback on); the preview follows every change
+  const openAuto = () => setAuto({ scope: { term: 'all', branch: '' }, fallback: true })
   const apply = async () => {
     setBusy(true)
     try {
-      const rows = auto.result.assignments.map(({ TeacherID, SubjectCode, SectionID }) => ({ TeacherID, SubjectCode, SectionID }))
+      const rows = r.assignments.map(({ TeacherID, SubjectCode, SectionID }) => ({ TeacherID, SubjectCode, SectionID }))
       await importRows({ TeacherSubjectMap: rows })
       setMsg({ text: `Assigned ${rows.length} section-subject pairs.`, bad: false })
       setAuto(null)
@@ -35,8 +35,8 @@ export default function AssignmentTools() {
     setBusy(false)
   }
 
-  const setScope = (patch) => setAuto((a) => ({ ...a, result: null, scope: { ...a.scope, ...patch } }))
-  const r = auto?.result
+  const setScope = (patch) => setAuto((a) => ({ ...a, scope: { ...a.scope, ...patch } }))
+  const r = auto ? suggestAssignments({ db, scope: auto.scope, fallback: auto.fallback }) : null // fast: recomputed each render
 
   return (
     <>
@@ -88,7 +88,7 @@ export default function AssignmentTools() {
               <h3>Auto-assign by preference</h3>
               <button className="icon-btn" onClick={() => setAuto(null)} aria-label="Close">✕</button>
             </header>
-            <p className="muted">Generating a timetable does this automatically for its term and branch, so you only need it to preview or to assign ahead of time. Fills only the section-subject pairs that have no teacher yet. Existing assignments are kept and count toward each teacher's weekly load. Nothing is saved until you press Apply.</p>
+            <p className="muted">Generating a timetable does this automatically for its term and branch, so you only need it to preview or to assign ahead of time. Fills only the section-subject pairs that have no teacher yet. Existing assignments are kept and count toward each teacher's weekly load. The list below updates as you change the options; nothing is saved until you press Apply.</p>
             <div className="gen-controls">
               <label className="field"><span>Semesters</span>
                 <select value={auto.scope.term} onChange={(e) => setScope({ term: e.target.value })}>{Object.entries(TERMS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
@@ -99,13 +99,14 @@ export default function AssignmentTools() {
                   {db.Branches.filter((b) => b._status === 'approved').map((b) => <option key={b._id} value={b.BranchCode}>{b.BranchCode}</option>)}
                 </select>
               </label>
-              <button className="btn" onClick={preview}>Preview</button>
             </div>
-            <label className="check"><input type="checkbox" checked={auto.fallback} onChange={(e) => setAuto((a) => ({ ...a, result: null, fallback: e.target.checked }))} /> If nobody asked for a subject, use the least-loaded teacher of that branch</label>
+            <label className="check"><input type="checkbox" checked={auto.fallback} onChange={(e) => setAuto((a) => ({ ...a, fallback: e.target.checked }))} /> If nobody asked for a subject, use the least-loaded teacher of that branch</label>
 
             {r && (
               <>
-                <p className={r.unassigned.length ? 'notice' : 'ok'}>{r.assignments.length} of {r.considered} pairs can be assigned{r.unassigned.length ? `; ${r.unassigned.length} cannot` : ''}.</p>
+                <p className={r.unassigned.length ? 'notice' : 'ok'}>{r.considered ? `${r.assignments.length} of ${r.considered} pairs can be assigned${r.unassigned.length ? `; ${r.unassigned.length} cannot` : ''}.` : (db.Sections.some((x) => x._status === 'approved' && (!auto.scope.branch || x.BranchCode === auto.scope.branch) && (auto.scope.term === 'all' || Number(x.Semester) % 2 === (auto.scope.term === 'odd' ? 1 : 0)))
+                  ? 'Every section-subject pair in this scope already has a teacher. Nothing to assign.'
+                  : `No approved sections for ${auto.scope.term === 'all' ? 'any semester' : `${auto.scope.term} semesters`}${auto.scope.branch ? ` in ${auto.scope.branch}` : ''}. Nothing to assign.`)}</p>
                 {r.assignments.length > 0 && (
                   <div className="grid-scroll short">
                     <table className="grid">
