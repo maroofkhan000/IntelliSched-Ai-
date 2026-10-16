@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import analyze
+from . import analyze, explain
 from .clean import clean, score_cleaning
 from .generate import GenConfig, generate_to_file
 from .solver import DEFAULT_WEIGHTS, solve, verify
@@ -38,6 +38,7 @@ def instance_features(data, checks, detail):
 
 def run(input_path=None, term="odd", branches=None, gen=None, weights=None, time_limit=60, name=None, quiet=False, charts=True):
     say = (lambda *a: None) if quiet else print
+    why = (lambda text: None) if quiet else (lambda text: text and print(text))  # the reasons under each step
     name = name or (Path(input_path).stem if input_path else f"synthetic_seed{gen.seed}")
     out = ROOT / "reports" / name
     out.mkdir(parents=True, exist_ok=True)
@@ -80,6 +81,9 @@ def run(input_path=None, term="odd", branches=None, gen=None, weights=None, time
     ])
     say(f"[2/5] analysis -> {(out / '01_analysis.md').relative_to(ROOT)}  "
         f"(whole catalog: {int((all_checks.status == 'FAIL').sum())} FAIL checks)")
+    if (all_checks.status != "PASS").any():
+        say("      if every semester ran at once:")
+        why(explain.feasibility(all_checks))
 
     # 3. removal & filter
     res = clean(raw, term=term, branches=branches)
@@ -96,6 +100,7 @@ def run(input_path=None, term="odd", branches=None, gen=None, weights=None, time
     say(f"[3/5] cleaned -> {clean_path.relative_to(ROOT)}  repaired {int((acted.action == 'repaired').sum())}, "
         f"removed {int((acted.action == 'removed').sum())}, filtered {int((res.log.action == 'filtered').sum())}"
         + (f"  | caught {score['detected']}/{score['injected']} injected, {score['false_alarms']} false alarms" if score else ""))
+    why(explain.cleaning(res.log))
 
     # 4. feasibility gate on the term that will be scheduled
     checks, detail = analyze.feasibility(res.data)
@@ -106,6 +111,7 @@ def run(input_path=None, term="odd", branches=None, gen=None, weights=None, time
     fails = checks[checks.status == "FAIL"]
     say(f"[4/5] feasibility: {len(checks) - len(fails)}/{len(checks)} checks pass"
         + ("" if fails.empty else f"  FAIL: {', '.join(fails.check)} (solver will report what doesn't fit)"))
+    why(explain.feasibility(checks))
 
     # 5. solve and verify
     w = {**DEFAULT_WEIGHTS, **(weights or {})}
@@ -121,6 +127,7 @@ def run(input_path=None, term="odd", branches=None, gen=None, weights=None, time
         ("Unplaced sessions", sol.unplaced)])
     say(f"[5/5] {sol.status}: {sol.stats.get('placed_periods', 0)} periods placed, {sol.stats.get('unplaced_sessions', '?')} sessions unplaced, "
         f"{len(problems)} hard-rule violations, {sol.stats.get('solve_seconds')}s -> {tt_path.relative_to(ROOT)}")
+    why(explain.solution(sol.stats, sol.unplaced))
 
     # run log = ML training data
     row = {"time": datetime.now().isoformat(timespec="seconds"), "instance": name, "term": term or "all",
