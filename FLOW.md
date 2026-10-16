@@ -113,8 +113,7 @@ timeline
                  : Building travel, teacher unavailability, fairer auto-assign (e1a3fd4)
                  : Favicon / app icons (053097d)
                  : Admin password for big deletes, logins from .env (08b9335)
-    Oct 2026 (this branch, uncommitted) : run-intellisched skill + driver
-                                        : One in-app ConfirmDialog for every delete
+    Oct 2026 : One in-app ConfirmDialog for every delete
                                         : M.Tech + AIML sem 4 subjects added (940 subjects)
                                         : All 20 IUL departments → 4,709 subjects, 120 programs
                                         : Degree catalog with per-branch length
@@ -126,18 +125,16 @@ timeline
 | # | Request | What was done | Checked by |
 |---|---|---|---|
 | 1 | "How to run this project" | Gave the two `npm run dev` commands | – |
-| 2 | Remember the run-skill notes | Saved a memory: skill, workarounds, shared live DB, read-only by default | – |
-| 3 | Subjects from iul.ac.in; dropdown empty; fix the delete UI | Found the dropdown worked, but the catalog lacked EEE, sem 8, AIML 4+, M.Tech. Added M.Tech for 11 branches and AIML sem 4 (+250). Explained empty cases in the dropdown. Replaced every `window.confirm` and the two-step password prompt with one `ConfirmDialog`. | Headless Chrome: dialogs open and cancel, 0 data-changing requests, 0 errors; lint |
-| 4 | "Add the rest of the departments; hide used options, also for sections" | Downloaded 872 PDFs and extracted about 17k rows. Hand-read about 40 scanned pages. Mapped 122 programs and merged 3,769 subjects. Added new degrees and branches with per-branch length. Hid used section letters and assigned subjects. | Catalog checks (no duplicates, semesters within length, no orphan branches); headless Chrome on Branches, Subjects, Sections; lint |
-| 5 | "Check Dr. Vihaan Iyer" | Teacher TT0010 (DSAI): approved, 2 valid preferences, 0 assignments, so not yet in any timetable | Live API read + Teachers screenshot |
-| 6 | Restart servers | Started both. Found port 5173 held by the CarRental project and a second IntelliSched frontend on 5174. Stopped the duplicate. The servers were later stopped by low memory (about 1.9 GB free). | curl on 4000 / 5174 |
+| 2 | Subjects from iul.ac.in; dropdown empty; fix the delete UI | Found the dropdown worked, but the catalog lacked EEE, sem 8, AIML 4+, M.Tech. Added M.Tech for 11 branches and AIML sem 4 (+250). Explained empty cases in the dropdown. Replaced every `window.confirm` and the two-step password prompt with one `ConfirmDialog`. | Headless Chrome: dialogs open and cancel, 0 data-changing requests, 0 errors; lint |
+| 3 | "Add the rest of the departments; hide used options, also for sections" | Downloaded 872 PDFs and extracted about 17k rows. Hand-read about 40 scanned pages. Mapped 122 programs and merged 3,769 subjects. Added new degrees and branches with per-branch length. Hid used section letters and assigned subjects. | Catalog checks (no duplicates, semesters within length, no orphan branches); headless Chrome on Branches, Subjects, Sections; lint |
+| 4 | "Check Dr. Vihaan Iyer" | Teacher TT0010 (DSAI): approved, 2 valid preferences, 0 assignments, so not yet in any timetable | Live API read + Teachers screenshot |
+| 5 | Restart servers | Started both. Found port 5173 held by the CarRental project and a second IntelliSched frontend on 5174. Stopped the duplicate. The servers were later stopped by low memory (about 1.9 GB free). | curl on 4000 / 5174 |
 
 ### 2.2 Problems hit along the way and how they were solved
 
 | Problem | Fix |
 |---|---|
 | Half-installed frontend `node_modules` broke Vite | `rm -rf node_modules && npm ci` |
-| Git Bash turns `/api/x` into `C:/Program Files/Git/api/x` | The driver strips that prefix |
 | Table routes are case-sensitive (`table/teachers` shows Overview) | Use `table/Teachers` |
 | PDF tables with blank spacer columns broke the hour parsing | Drop empty cells before reading L-T-P |
 | NEP codes (`B010301T/PY207`, `A040601T`) not recognised | Widened the code pattern |

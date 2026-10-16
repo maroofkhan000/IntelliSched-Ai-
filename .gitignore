@@ -16,3 +16,6 @@ frontend/src/imgref/
 !.vscode/extensions.json
 .idea
 .DS_Store
+
+# local AI-tool files, never pushed
+.claude/

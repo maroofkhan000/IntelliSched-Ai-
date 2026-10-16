@@ -147,30 +147,19 @@ Format per entry: **Context** (the problem), **Decision**, **Why**, **Trade-offs
 - **Why:** Fewer clicks, no duplicate-key errors after saving, and empty lists are no longer confusing.
 - **Trade-offs:** You can't see from the dropdown which items exist already. The table view shows that.
 
-## D18. A project skill and driver for agents
-
-- **Decision:** `.claude/skills/run-intellisched/` contains `SKILL.md` and `driver.mjs`, which uses Playwright with the installed Chrome.
-  - `ui`: logs in through the real form and takes screenshots.
-  - `api`: calls any authenticated route.
-  - `gen`: runs the generator against live data without saving anything.
-
-  Logins are read from `.env` and never printed.
-- **Why:** It's a repeatable, read-only way to check changes in the real app.
-- **Trade-offs:** It needs Chrome, and Git Bash rewrites `/api/...` arguments into Windows paths; the driver undoes that.
-
-## D19. Teaching assignments are automatic (Oct 2026)
+## D18. Teaching assignments are automatic (Oct 2026)
 
 - **Decision:** When the admin presses Generate, every section-subject pair in scope that has no teacher gets one first, and those assignments are saved. The rules are Auto-assign's, with the least-loaded teacher of the branch as a fallback. Assignments already in the table are kept, so manual choices still win.
 - **Why:** An empty Teaching Assignments table was the most common reason nothing could be scheduled.
 - **Teacher type:** A Theory or Lab teacher takes subjects of their own type first. When none is free, a teacher of the other type who listed the subject covers it, and the suggestion is marked "theory teacher covering a lab subject". The real data needed this: DSAI and CE have labs but no lab teachers.
 - **Trade-offs:** Generating now writes rows. Pairs no teacher can take are still listed as unscheduled, now with the exact reason (wrong type, everyone at max load, or nobody listed it).
 
-## D20. A branch in use can't be deleted (Oct 2026)
+## D19. A branch in use can't be deleted (Oct 2026)
 
 - **Decision:** Deleting or rejecting a branch is refused while sections, subjects or teachers still use its code. The server checks this (`branchesFree`), and the app checks it before the confirm dialog opens.
 - **Why:** A deleted EEE branch left two sections pointing at nothing.
 
-## D21. The app feeds the ML pipeline (Oct 2026)
+## D20. The app feeds the ML pipeline (Oct 2026)
 
 - **Decision:** Each saved timetable logs a record in the `mlruns` collection: scope, problem features (`mlRecord.js`), outcome and a snapshot of the approved input. `GET /api/ml/runs` (admin) serves the records as JSONL. `python -m intellisched pull` saves them under `ml/datasets/` and can re-solve each snapshot with CP-SAT. Datasets are stored as CSV and JSONL. The app also has an "Export for ML (.json)" button that keeps number types and settings.
 - **Why:** Training data grows on its own as the app is used, with no manual downloads.
@@ -183,7 +172,7 @@ Format per entry: **Context** (the problem), **Decision**, **Why**, **Trade-offs
 | Decisions | State |
 |---|---|
 | D1–D8, D10–D14 | Committed (`6007834` … `08b9335`) |
-| D9, D11 (new order), D15–D21 | On branch `env-logins-and-delete-password` (pushed, not merged to `main`) |
+| D9, D11 (new order), D15–D20 | Committed, on `main` |
 
 ## Open questions
 
