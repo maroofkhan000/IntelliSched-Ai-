@@ -162,7 +162,8 @@ Format per entry: **Context** (the problem), **Decision**, **Why**, **Trade-offs
 
 - **Decision:** When the admin presses Generate, every section-subject pair in scope that has no teacher gets one first, and those assignments are saved. The rules are Auto-assign's, with the least-loaded teacher of the branch as a fallback. Assignments already in the table are kept, so manual choices still win.
 - **Why:** An empty Teaching Assignments table was the most common reason nothing could be scheduled.
-- **Trade-offs:** Generating now writes rows. Pairs no teacher can take are still listed as unscheduled ("No teacher assigned").
+- **Teacher type:** A Theory or Lab teacher takes subjects of their own type first. When none is free, a teacher of the other type who listed the subject covers it, and the suggestion is marked "theory teacher covering a lab subject". The real data needed this: DSAI and CE have labs but no lab teachers.
+- **Trade-offs:** Generating now writes rows. Pairs no teacher can take are still listed as unscheduled, now with the exact reason (wrong type, everyone at max load, or nobody listed it).
 
 ## D20. A branch in use can't be deleted (Oct 2026)
 

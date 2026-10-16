@@ -8,6 +8,8 @@
 //   4. Teacher belongs to the subject's branch
 //   5. Lower share of their max weekly load used (load / max, not raw hours)
 //   6. A fixed per-subject shuffle, so the last tie-break doesn't always favour the same IDs
+//   A teacher typed Theory or Lab takes subjects of that type first; when none is free, a teacher
+//   of the other type who listed the subject covers it (noted on the suggestion).
 // Only approved rows are used. Assignments already in the table are kept and their hours count
 // against each teacher's max weekly load.
 
@@ -58,6 +60,16 @@ export function rankTeachers(db, subjectCode, loads = teacherLoads(db), counts =
   return out.sort(byClaim)
 }
 
+// Why a pair got no teacher, in words the admin can act on.
+function whyNot(j, fallback) {
+  const type = j.sub.Type === 'Lab' ? 'lab' : 'theory'
+  let why
+  if (j.wanted.length) why = `Every ${type} teacher who listed it (${j.wanted.map((c) => c.teacher.TeacherID).join(', ')}) is at their max weekly load`
+  else if (j.cover.length) why = `Every teacher who listed it (${j.cover.map((c) => c.teacher.TeacherID).join(', ')}) is at their max weekly load`
+  else why = 'No teacher listed this subject in Preferences'
+  return fallback ? `${why}, and ${j.sec.BranchCode} has no ${type} teacher with free hours` : why
+}
+
 // Propose a teacher for every section + subject that has no assignment yet.
 export function suggestAssignments({ db, scope = {}, fallback = false }) {
   const sections = approved(db.Sections).filter((s) => {
@@ -76,8 +88,9 @@ export function suggestAssignments({ db, scope = {}, fallback = false }) {
   for (const sec of sections) {
     for (const sub of subjects.filter((x) => x.BranchCode === sec.BranchCode && num(x.Semester) === num(sec.Semester))) {
       if (done.has(`${sec.SectionID}|${sub.SubjectCode}`)) continue
-      const wanted = rankTeachers(db, sub.SubjectCode, loads, counts).filter((c) => !c.teacher.TeacherType || c.teacher.TeacherType === sub.Type)
-      jobs.push({ sec, sub, hours: num(sub.WeeklyHours), wanted })
+      const listed = rankTeachers(db, sub.SubjectCode, loads, counts)
+      const wanted = listed.filter((c) => !c.teacher.TeacherType || c.teacher.TeacherType === sub.Type)
+      jobs.push({ sec, sub, hours: num(sub.WeeklyHours), wanted, cover: listed.filter((c) => !wanted.includes(c)) })
     }
   }
   // fewest interested teachers first, so scarce specialists aren't used up on easy subjects
@@ -92,16 +105,27 @@ export function suggestAssignments({ db, scope = {}, fallback = false }) {
     assignments.push({ SectionID: j.sec.SectionID, SubjectCode: j.sub.SubjectCode, SubjectName: j.sub.SubjectName, hours: j.hours, TeacherID: pick.teacher.TeacherID, TeacherName: pick.teacher.Name, priority: pick.priority, years: pick.years, note })
   }
 
-  // pass 1: honour preferences (this pass always finishes before any fallback is used)
-  const left = []
+  // current load and sections held, best claim first, only teachers with room for these hours
+  const available = (j, cands) => cands.map((c) => ({ ...c, load: loads.get(c.teacher.TeacherID) ?? 0, held: counts.get(`${c.teacher.TeacherID}|${j.sub.SubjectCode}`) ?? 0 }))
+    .sort(byClaim).filter((c) => c.load + j.hours <= num(c.teacher.MaxWeeklyLoad))
+
+  // pass 1: honour preferences with teachers of the subject's type (finishes before any fallback)
+  let left = []
   for (const j of jobs) {
-    const live = j.wanted.map((c) => {
-      return { ...c, load: loads.get(c.teacher.TeacherID) ?? 0, held: counts.get(`${c.teacher.TeacherID}|${j.sub.SubjectCode}`) ?? 0 }
-    }).sort(byClaim)
-      .filter((c) => c.load + j.hours <= num(c.teacher.MaxWeeklyLoad))
-    if (live[0]) record(j, live[0], '')
+    const pick = available(j, j.wanted)[0]
+    if (pick) record(j, pick, '')
     else left.push(j)
   }
+
+  // pass 1b: no teacher of the right type is free, so a teacher of the other type who listed the
+  // subject covers it (e.g. a theory teacher running a lab their branch has no lab teacher for)
+  const stillLeft = []
+  for (const j of left) {
+    const pick = available(j, j.cover)[0]
+    if (pick) record(j, pick, `${pick.teacher.TeacherType === 'Lab' ? 'lab' : 'theory'} teacher covering a ${j.sub.Type === 'Lab' ? 'lab' : 'theory'} subject`)
+    else stillLeft.push(j)
+  }
+  left = stillLeft
 
   // pass 2: whatever is left goes to the least-loaded teacher of the branch, if allowed
   for (const j of left) {
@@ -112,7 +136,7 @@ export function suggestAssignments({ db, scope = {}, fallback = false }) {
         .sort((x, y) => (loads.get(x.TeacherID) ?? 0) - (loads.get(y.TeacherID) ?? 0))
       if (free[0]) { record(j, { teacher: free[0], priority: null, years: 0 }, 'no preference — least-loaded teacher of the branch'); continue }
     }
-    unassigned.push({ SectionID: j.sec.SectionID, SubjectCode: j.sub.SubjectCode, SubjectName: j.sub.SubjectName, hours: j.hours, reason: j.wanted.length ? 'Every teacher who wants this subject is at their max weekly load' : 'No teacher listed this subject in Preferences' })
+    unassigned.push({ SectionID: j.sec.SectionID, SubjectCode: j.sub.SubjectCode, SubjectName: j.sub.SubjectName, hours: j.hours, reason: whyNot(j, fallback) })
   }
   assignments.sort((a, b) => a.SectionID.localeCompare(b.SectionID) || a.SubjectCode.localeCompare(b.SubjectCode))
   return { assignments, unassigned, considered: jobs.length }

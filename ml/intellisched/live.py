@@ -72,15 +72,15 @@ def auto_assign(data):
         for sub in subs[(subs.BranchCode == sec.BranchCode) & (subs.Semester.map(_num) == _num(sec.Semester))].itertuples():
             if (sec.SectionID, sub.SubjectCode) in done:
                 continue
-            wanted = [p for p in prefs[prefs.SubjectCode == sub.SubjectCode].itertuples()
-                      if p.TeacherID in teachers and type_ok(teachers[p.TeacherID], sub)]
+            # everyone who listed it; a teacher of the other type only covers when no matching one is free
+            wanted = [p for p in prefs[prefs.SubjectCode == sub.SubjectCode].itertuples() if p.TeacherID in teachers]
             jobs.append((sec, sub, _num(sub.WeeklyHours), wanted))
-    jobs.sort(key=lambda j: (len(j[3]), -j[2]))  # fewest interested teachers first, as in the app
+    jobs.sort(key=lambda j: (sum(type_ok(teachers[p.TeacherID], j[1]) for p in j[3]), -j[2]))  # fewest interested teachers first, as in the app
     added = []
     for sec, sub, h, wanted in jobs:
         fits = lambda tid: load.get(tid, 0) + h <= _num(teachers[tid].MaxWeeklyLoad)
         claims = sorted((p for p in wanted if fits(p.TeacherID)), key=lambda p: (
-            _num(p.Priority) or 9, -_num(p.ExperienceYears), held.get((p.TeacherID, sub.SubjectCode), 0),
+            not type_ok(teachers[p.TeacherID], sub), _num(p.Priority) or 9, -_num(p.ExperienceYears), held.get((p.TeacherID, sub.SubjectCode), 0),
             teachers[p.TeacherID].BranchCode != sub.BranchCode,
             load.get(p.TeacherID, 0) / max(1, _num(teachers[p.TeacherID].MaxWeeklyLoad)), p.TeacherID))
         tid = claims[0].TeacherID if claims else None
