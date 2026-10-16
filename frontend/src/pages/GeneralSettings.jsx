@@ -5,7 +5,7 @@ import { useStore } from '../store'
 const ORDERED = (days) => WEEK.filter((d) => days.includes(d))
 
 export default function GeneralSettings() {
-  const { settings, saveSettings, applyTimeSlots, isAdmin, activeDb, db, confirm } = useStore()
+  const { settings, saveSettings, applyTimeSlots, isAdmin, activeDb } = useStore()
   const [showTimings, setShowTimings] = useState(true)
   const [msg, setMsg] = useState({ text: '', bad: false })
   const { schoolDays, periodsPerDay, timingMode, auto, avail } = settings
@@ -33,8 +33,8 @@ export default function GeneralSettings() {
   const setAll = (v) => saveSettings({ avail: v ? Object.fromEntries(days.flatMap((d) => periods.map((p) => [`${d}|${p}`, v]))) : {} })
 
   const apply = async () => {
-    if (db.TimeSlots.length && !await confirm({ title: 'Replace Time Slots', message: `Replace the ${db.TimeSlots.length} existing Time Slots with the grid below?`, confirmLabel: 'Replace' })) return
-    const err = await applyTimeSlots()
+    const err = await applyTimeSlots() // asks (with the admin password) when it replaces existing slots
+    if (err === null) return
     setMsg(err ? { text: err, bad: true } : { text: 'Time Slots updated from these settings.', bad: false })
   }
 

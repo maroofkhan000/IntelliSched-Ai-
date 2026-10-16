@@ -58,7 +58,7 @@ sequenceDiagram
     participant S as store.jsx (confirmThen)
     participant API as Express API
     U->>S: deleteRows(table, ids)
-    S->>UI: ask(title, message, password? = >10 rows or whole table)
+    S->>UI: ask(title, message, admin password)
     UI-->>S: cancel → stop
     UI-->>S: confirm (+ password)
     S->>API: POST /rows/delete {ids, adminPassword}
@@ -92,7 +92,7 @@ sequenceDiagram
 | Action | Feeder | Admin |
 |---|---|---|
 | Add / edit rows | yes (saved as `pending`) | yes (saved as `approved`) |
-| Delete rows | only their own pending rows | any; more than 10 rows or a whole table needs the admin password |
+| Delete rows | only their own pending rows | any; always with the admin password |
 | Approve / reject | no | yes |
 | Branches, Teaching Assignments, Settings, Generate | no | yes |
 | Create / delete databases | no | yes (deleting one needs the password if it has more than 1 row) |

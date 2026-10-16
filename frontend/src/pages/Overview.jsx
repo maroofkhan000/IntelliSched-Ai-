@@ -9,39 +9,25 @@ import { useStore } from '../store'
 const SETUP = ['Branches', 'TimeSlots', 'Rooms', 'Subjects', 'Sections', 'Teachers', 'TeacherSubjectMap']
 
 export default function Overview() {
-  const { db, settings, isAdmin, importRows, clearAll, activeDb, confirm } = useStore()
+  const { db, settings, isAdmin, importRows, clearAll, activeDb } = useStore()
   const fileRef = useRef(null)
   const [msg, setMsg] = useState('')
   const [busy, setBusy] = useState(false)
   const h = computeHealth(db)
   const total = TABLE_ORDER.reduce((n, t) => n + db[t].length, 0)
 
-  // An import merges into the open database: new rows are added and any row with the same key
-  // (a teacher ID, a time slot's day + period…) is overwritten. On a database that already has
-  // data, say so and ask first.
+  // An import merges into the open database; importRows asks first (with the admin password)
+  // when that database already has data.
   const runImport = async (getBuffer, replace, what) => {
     setBusy(true)
     setMsg('')
     try {
       const { data, report } = await parseWorkbook(await getBuffer())
       if (!Object.keys(report).length) throw new Error('No recognised sheets found (expected Branches, Sections, Subjects, Teachers, Rooms, TimeSlots…)')
-      if (total > 0) {
-        const keyOf = (t, r) => TABLES[t].key.map((k) => String(r[k] ?? '').trim().toUpperCase()).join('|')
-        const clash = Object.entries(data).map(([t, rows]) => {
-          const have = new Set(db[t].map((r) => keyOf(t, r)))
-          return [t, rows.filter((r) => have.has(keyOf(t, r))).length]
-        }).filter(([, n]) => n)
-        const ok = await confirm({
-          title: `Import ${what} into "${activeDb.name}"?`,
-          message: `This adds ${Object.entries(report).map(([k, v]) => `${v} ${TABLES[k]?.label.toLowerCase() ?? k}`).join(', ')} to your ${total} existing rows.${clash.length ? ` It also OVERWRITES ${clash.map(([t, n]) => `${n} ${TABLES[t].label.toLowerCase()}`).join(', ')} that you already have.` : ''} To try it without touching your data, create a new empty database first (the + next to the database name).`,
-          confirmLabel: 'Import anyway',
-        })
-        if (!ok) return
-      }
-      await importRows(data, { replace })
+      await importRows(data, { replace, ask: { title: `Import ${what} into "${activeDb.name}"?`, confirmLabel: 'Import anyway' } })
       setMsg(`Imported: ${Object.entries(report).map(([k, v]) => `${k} ${v}`).join(' · ')}`)
     } catch (e) {
-      setMsg(`Import failed: ${e.message}`)
+      if (!e.cancelled) setMsg(`Import failed: ${e.message}`)
     } finally {
       setBusy(false)
     }

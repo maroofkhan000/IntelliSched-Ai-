@@ -52,12 +52,13 @@ Format per entry: **Context** (the problem), **Decision**, **Why**, **Trade-offs
 - **Why:** It works on serverless Vercel, where there is no in-memory session store. The TTL index removes old lockouts without a cron job.
 - **Trade-offs:** Tokens can't be revoked before they expire. Signing out only drops the client's copy.
 
-## D8. Big deletes need the admin password again
+## D8. Deleting or overwriting data needs the admin password again
 
 - **Context:** One click could wipe a table that many people filled in.
-- **Decision:** Deleting **more than 10 rows, or a whole table** (more than one row) needs the admin password, even when an admin is already signed in. The server enforces it (`adminPasswordOk`, `BULK_LIMIT = 10`). The same lockout applies to wrong admin passwords.
+- **Decision:** Anything that deletes or overwrites existing data needs the admin password, even when an admin is already signed in. That covers any delete (even one row), reject, clear everything, delete database, clear timetable, Replace Time Slots, Load sample dataset, and importing into a database that already has data. Importing into an empty database and adding new teaching assignments (Auto-assign or Generate) don't need it, because nothing can be lost. The server enforces it (`adminPasswordOk`), and the same lockout applies to wrong passwords. Feeders deleting their own pending rows are never asked.
+- **History:** At first only deletes of more than 10 rows, or a whole table, needed it. That was widened in Oct 2026 after a one-click "Load sample dataset" overwrote 33 time slots and added 800 rows to the shared database.
 - **Why:** It's protection against accidents and against a stolen admin session.
-- **Trade-offs:** Big clean-ups take an extra step.
+- **Trade-offs:** Every delete takes an extra step, including a single row.
 
 ## D9. One in-app confirm dialog for every delete (Oct 2026)
 
@@ -70,7 +71,7 @@ Format per entry: **Context** (the problem), **Decision**, **Why**, **Trade-offs
 
   There are no `window.confirm` calls left.
 - **Why:** One consistent dialog, one step instead of two, no browser-blocking popups (which also block test automation), and wording that matches the action.
-- **Trade-offs:** The client copies the server's `BULK_LIMIT`. If the two drift apart, the server still wins and the dialog just asks a second time.
+- **Trade-offs:** The client repeats the server's rule to know when to ask. If the two drift apart, the server still wins and the dialog just asks a second time.
 
 ## D10. Teacher preferences live inside the Teachers form
 

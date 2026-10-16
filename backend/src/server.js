@@ -32,15 +32,16 @@ const auth = (req, res, next) => {
 const adminOnly = (req, res, next) => (req.user.role === 'admin' ? next() : fail(res, 403, 'Admin only.'))
 const publicUser = (u) => ({ username: u.username, role: u.role, name: u.name })
 
-// Deleting more than BULK_LIMIT rows, or a whole table at once, needs an admin's password
-// (sent as `adminPassword`), even when an admin is signed in. Sends the error response itself
-// and returns false when the password is missing, wrong, or locked out after too many tries.
-const BULK_LIMIT = 10
-const adminPasswordOk = async (req, res, count, wholeTable) => {
-  if (count <= BULK_LIMIT && !(wholeTable && count > 1)) return true
+// Anything that deletes or overwrites existing data (any delete, reject, clear, import over
+// existing rows, replacing time slots, clearing the timetable) needs an admin's password (sent as
+// `adminPassword`), even when an admin is signed in. `what` names the action for the message.
+// Sends the error response itself and returns false when the password is missing, wrong, or
+// locked out after too many tries. Nothing to lose (count 0) needs no password.
+const adminPasswordOk = async (req, res, count, what = `Deleting ${count} row${count === 1 ? '' : 's'}`) => {
+  if (count <= 0) return true
   const password = String(req.body?.adminPassword ?? '')
   if (!password) {
-    fail(res, 403, `Deleting ${count} rows at once needs the admin password.`, { needsPassword: true })
+    fail(res, 403, `${what} needs the admin password.`, { needsPassword: true })
     return false
   }
   const key = `adminpw:${req.user.username}`
@@ -101,7 +102,7 @@ app.patch('/api/databases/:id', adminOnly, wrap(async (req, res) => {
 
 app.delete('/api/databases/:id', adminOnly, wrap(async (req, res) => {
   if ((await store.databases.countDocuments()) < 2) return fail(res, 400, 'Keep at least one database.')
-  if (!(await adminPasswordOk(req, res, await store.rows.countDocuments({ dbId: req.params.id }), true))) return
+  if (!(await adminPasswordOk(req, res, await store.rows.countDocuments({ dbId: req.params.id }), 'Deleting a database'))) return
   await store.rows.deleteMany({ dbId: req.params.id })
   await store.databases.deleteOne({ _id: req.params.id })
   res.json({ ok: true })
@@ -155,6 +156,7 @@ app.put('/api/databases/:id/settings', withDb, wrap(async (req, res) => {
 app.put('/api/databases/:id/timetable', adminOnly, withDb, wrap(async (req, res) => {
   const t = req.body?.timetable
   if (t !== null && !(t && Array.isArray(t.entries) && Array.isArray(t.unscheduled))) return fail(res, 400, 'Invalid timetable.')
+  if (t === null && req.dbDoc.timetable && !(await adminPasswordOk(req, res, 1, 'Clearing the timetable'))) return
   await store.databases.updateOne({ _id: req.dbDoc._id }, t === null ? { $unset: { timetable: '' } } : { $set: { timetable: t } })
   if (t) await logMlRun(req, t)
   res.json({ ok: true })
@@ -281,10 +283,9 @@ app.post('/api/databases/:id/tables/:table/rows/delete', withDb, withTable, wrap
   const filter = { dbId: req.dbDoc._id, table: req.params.table, _id: { $in: ids } }
   if (req.user.role !== 'admin') Object.assign(filter, { _status: 'pending', _by: req.user.username })
   const count = await store.rows.countDocuments(filter)
-  const whole = count === (await store.rows.countDocuments({ dbId: req.dbDoc._id, table: req.params.table }))
   // a feeder can only reach their own pending rows, so they never need (or get to test) the admin password
   if (!(await branchesFree(req, res, filter))) return
-  if (req.user.role === 'admin' && !(await adminPasswordOk(req, res, count, whole))) return
+  if (req.user.role === 'admin' && !(await adminPasswordOk(req, res, count))) return
   const gone = req.params.table === 'Teachers' ? (await store.rows.find(filter).toArray()).map((t) => t.TeacherID) : []
   const r = await store.rows.deleteMany(filter)
   if (gone.length) await store.rows.deleteMany({ dbId: req.dbDoc._id, table: { $in: ['TeacherPreferences', 'TeacherAvailability'] }, TeacherID: { $in: gone } })
@@ -301,8 +302,7 @@ app.post('/api/databases/:id/tables/:table/status', adminOnly, withDb, withTable
   if (status === 'rejected') {
     if (!(await branchesFree(req, res, filter))) return
     const count = await store.rows.countDocuments(filter)
-    const whole = count === (await store.rows.countDocuments({ dbId: req.dbDoc._id, table: req.params.table }))
-    if (!(await adminPasswordOk(req, res, count, whole))) return
+    if (!(await adminPasswordOk(req, res, count, `Rejecting ${count} row${count === 1 ? '' : 's'}`))) return
     await store.rows.deleteMany(filter)
     if (tids.length) await store.rows.deleteMany(prefFilter)
   } else {
@@ -319,6 +319,21 @@ app.post('/api/databases/:id/import', adminOnly, withDb, wrap(async (req, res) =
   const dbId = req.dbDoc._id
   const tables = TABLE_ORDER.filter((t) => Array.isArray(incoming[t]))
   const data = await store.loadData(dbId)
+  // Importing into a database that already has data needs the admin password when it would
+  // replace or overwrite rows, or bring in anything besides new teaching assignments (what
+  // Auto-assign / Generate send). Importing into an empty database never does.
+  const existing = TABLE_ORDER.reduce((n, t) => n + data[t].length, 0)
+  const replaced = replace ? tables.reduce((n, t) => n + data[t].length, 0) : 0
+  let overwritten = 0
+  for (const table of tables) {
+    const have = new Set(data[table].map((r) => recordKey(table, r)))
+    for (const row of incoming[table]) if (have.has(recordKey(table, coerce(table, pick(table, withDerived(table, row, data)))))) overwritten++
+  }
+  const onlyNewAssignments = tables.every((t) => t === 'TeacherSubjectMap') && !overwritten && !replaced
+  if (existing && !onlyNewAssignments) {
+    const what = replaced ? `Replacing ${replaced} existing row${replaced === 1 ? '' : 's'}` : overwritten ? `Importing over ${overwritten} existing row${overwritten === 1 ? '' : 's'}` : 'Importing into a database that already has data'
+    if (!(await adminPasswordOk(req, res, Math.max(1, replaced + overwritten), what))) return
+  }
   if (replace) {
     await store.rows.deleteMany({ dbId, table: { $in: tables } })
     for (const t of tables) data[t] = []
@@ -341,7 +356,7 @@ app.post('/api/databases/:id/import', adminOnly, withDb, wrap(async (req, res) =
 }))
 
 app.delete('/api/databases/:id/rows', adminOnly, withDb, wrap(async (req, res) => {
-  if (!(await adminPasswordOk(req, res, await store.rows.countDocuments({ dbId: req.dbDoc._id }), true))) return
+  if (!(await adminPasswordOk(req, res, await store.rows.countDocuments({ dbId: req.dbDoc._id }), 'Clearing every table'))) return
   await store.rows.deleteMany({ dbId: req.dbDoc._id })
   res.json({ ok: true })
 }))

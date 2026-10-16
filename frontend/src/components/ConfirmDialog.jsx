@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useStore } from '../store'
 
 // The one dialog every delete goes through: confirms, and asks for the admin password when a
-// big delete (more than 10 rows, or a whole table) needs it.
+// action deletes or overwrites existing data.
 export default function ConfirmDialog() {
   const { dialog, answerDialog } = useStore()
   const [p, setP] = useState('')
@@ -24,7 +24,7 @@ export default function ConfirmDialog() {
             <label className="field">
               <span>Admin password</span>
               <input type="password" value={p} onChange={(e) => setP(e.target.value)} autoComplete="off" autoFocus />
-              <small className="sub">Needed to delete more than 10 rows, or a whole table, at once.</small>
+              <small className="sub">Needed for anything that deletes or overwrites existing data.</small>
             </label>
           )}
           {dialog.error && <p className="errors">{dialog.error}</p>}

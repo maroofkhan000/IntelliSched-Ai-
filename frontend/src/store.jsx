@@ -3,7 +3,7 @@ import { api, getToken, setToken } from './api'
 import { suggestAssignments } from './assigner'
 import { generateTimetable as buildTimetable } from './generator'
 import { problemFeatures } from './mlRecord'
-import { TABLES, TABLE_ORDER, WEEK, defaultSettings, effectiveTimings } from './schema'
+import { TABLES, TABLE_ORDER, WEEK, defaultSettings, effectiveTimings, recordKey, withDerived } from './schema'
 
 const ACTIVE_KEY = 'intellisched.active.v1' // remembers which database you had open
 const emptyDb = () => Object.fromEntries(TABLE_ORDER.map((t) => [t, []]))
@@ -42,9 +42,9 @@ export function StoreProvider({ children }) {
     }
   }, [])
 
-  // Every delete goes through one in-app dialog. Big deletes (more than 10 rows, or a whole
-  // table) need an admin's password; when we can tell up front, the dialog asks for it straight
-  // away, and if the server still wants it (or it was wrong) the dialog asks again with the reason.
+  // Every delete, reject, clear and overwriting import goes through one in-app dialog that asks
+  // for the admin password straight away (the server requires it for anything that deletes or
+  // overwrites data); if the password was wrong, the dialog asks again with the reason.
   const answerDialog = useCallback((v) => setDialog((d) => { d?.resolve(v); return null }), [])
   const confirmThen = useCallback(async ({ title, message, confirmLabel, password = false, skipConfirm = false }, send) => {
     // one dialog at a time: a new question cancels one still open, so its action ends instead of hanging
@@ -69,8 +69,8 @@ export function StoreProvider({ children }) {
   }, [])
   // plain yes/no in the same dialog; resolves to true or false
   const confirm = useCallback((opts) => confirmThen(opts, () => true).catch(() => false), [confirmThen])
-  const BULK_LIMIT = 10 // same as the server's
-  const needsPw = (count, wholeTable) => count > BULK_LIMIT || (wholeTable && count > 1)
+  // same rule as the server: deleting or overwriting anything that exists needs the admin password
+  const needsPw = (count) => count > 0
   const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`
 
   const flushSettings = useCallback(async () => {
@@ -158,7 +158,7 @@ export function StoreProvider({ children }) {
   const deleteDatabase = useCallback((id) => guard(async () => {
     const d = databases.find((x) => x.id === id)
     await confirmThen(
-      { title: 'Delete database', message: `Delete "${d?.name}" and all ${plural(d?.rows ?? 0, 'row')} in it? This can't be undone.`, confirmLabel: 'Delete database', password: needsPw(d?.rows ?? 0, true) },
+      { title: 'Delete database', message: `Delete "${d?.name}" and all ${plural(d?.rows ?? 0, 'row')} in it? This can't be undone.`, confirmLabel: 'Delete database', password: needsPw(d?.rows ?? 0) },
       (adminPassword) => api(`/databases/${id}`, { method: 'DELETE', body: { adminPassword } }),
     )
     const list = await refreshList()
@@ -214,7 +214,7 @@ export function StoreProvider({ children }) {
       {
         title: ids.length === 1 ? 'Delete row' : `Delete ${plural(ids.length, 'row')}`,
         message: `${whole && ids.length > 1 ? 'This empties the whole' : `Delete ${ids.length === 1 ? 'this row' : plural(ids.length, 'row')} from`} ${table} table${table === 'Teachers' ? `, along with ${ids.length === 1 ? "this teacher's" : "those teachers'"} preferences and availability` : ''}. This can't be undone.`,
-        password: isAdmin && needsPw(ids.length, whole),
+        password: isAdmin && needsPw(ids.length),
       },
       (adminPassword) => api(`/databases/${active.id}/tables/${table}/rows/delete`, { method: 'POST', body: { ids, adminPassword } }),
     )
@@ -230,8 +230,7 @@ export function StoreProvider({ children }) {
   const setStatus = useCallback((table, ids, status) => guard(async () => {
     const send = (adminPassword) => api(`/databases/${active.id}/tables/${table}/status`, { method: 'POST', body: { ids, status, adminPassword } })
     if (status === 'rejected') {
-      const whole = ids.length === (active.data[table] ?? []).length
-      await confirmThen({ title: 'Reject entries', message: `Rejecting deletes ${plural(ids.length, 'row')} from ${table}.`, confirmLabel: 'Reject', password: needsPw(ids.length, whole), skipConfirm: true }, send)
+      await confirmThen({ title: 'Reject entries', message: `Rejecting deletes ${plural(ids.length, 'row')} from ${table}.`, confirmLabel: 'Reject', password: needsPw(ids.length), skipConfirm: true }, send)
     } else await send()
     const set = new Set(ids)
     const apply = (rows, hit) => (status === 'rejected' ? rows.filter((r) => !hit(r)) : rows.map((r) => (hit(r) ? { ...r, _status: status } : r)))
@@ -242,17 +241,39 @@ export function StoreProvider({ children }) {
   }).catch(() => {}), [guard, confirmThen, active])
 
   // Merge rows (e.g. from an Excel file). Rows with the same key are replaced.
-  // Rejects on failure so callers can show the message.
-  const importRows = useCallback((incoming, { replace = false } = {}) => guard(async () => {
-    const { data } = await api(`/databases/${active.id}/import`, { method: 'POST', body: { data: incoming, replace } })
+  // Into a database that already has data this asks first, with the admin password, saying what
+  // will be added and what overwritten (same rule as the server; only brand-new teaching
+  // assignments go straight through). `ask` = { title, confirmLabel, intro } for the dialog.
+  // Rejects on failure (or { cancelled: true }) so callers can show the message.
+  const importRows = useCallback((incoming, { replace = false, ask = {} } = {}) => guard(async () => {
+    const data0 = active.data
+    const tables = TABLE_ORDER.filter((t) => Array.isArray(incoming[t]))
+    const existing = TABLE_ORDER.reduce((n, t) => n + (data0[t]?.length ?? 0), 0)
+    const replaced = replace ? tables.reduce((n, t) => n + (data0[t]?.length ?? 0), 0) : 0
+    const clash = tables.map((t) => {
+      const have = new Set((data0[t] ?? []).map((r) => recordKey(t, r).toUpperCase()))
+      return [t, incoming[t].filter((r) => have.has(recordKey(t, withDerived(t, r, data0)).toUpperCase())).length]
+    }).filter(([, n]) => n)
+    const onlyNewAssignments = tables.every((t) => t === 'TeacherSubjectMap') && !clash.length && !replaced
+    const label = (t) => TABLES[t]?.label.toLowerCase() ?? t
+    const message = [
+      ask.intro,
+      replace ? `This replaces the ${plural(replaced, 'row')} now in ${tables.map(label).join(', ')}.`
+        : `This adds ${tables.map((t) => `${incoming[t].length} ${label(t)}`).join(', ')} to the ${plural(existing, 'row')} in "${active.name}".`,
+      !replace && clash.length ? `It OVERWRITES ${clash.map(([t, n]) => `${n} ${label(t)}`).join(', ')} you already have.` : '',
+      'To try data without touching this database, create a new empty one first (the + next to the database name).',
+    ].filter(Boolean).join(' ')
+    const send = (adminPassword) => api(`/databases/${active.id}/import`, { method: 'POST', body: { data: incoming, replace, adminPassword } })
+    const asks = existing > 0 && !onlyNewAssignments
+    const { data } = await confirmThen({ title: ask.title ?? `Import into "${active.name}"`, message, confirmLabel: ask.confirmLabel ?? 'Import', password: asks, skipConfirm: !asks }, send)
     setActive((a) => ({ ...a, data }))
     refreshList()
-  }), [guard, active?.id, refreshList])
+  }), [guard, confirmThen, active, refreshList])
 
   const clearAll = useCallback(() => guard(async () => {
     const total = Object.values(active.data).reduce((n, rows) => n + rows.length, 0)
     await confirmThen(
-      { title: 'Clear everything', message: `Delete all ${plural(total, 'row')} in every table of "${active.name}"? This can't be undone.`, confirmLabel: 'Clear everything', password: needsPw(total, true) },
+      { title: 'Clear everything', message: `Delete all ${plural(total, 'row')} in every table of "${active.name}"? This can't be undone.`, confirmLabel: 'Clear everything', password: needsPw(total) },
       (adminPassword) => api(`/databases/${active.id}/rows`, { method: 'DELETE', body: { adminPassword } }),
     )
     setActive((a) => ({ ...a, data: emptyDb() }))
@@ -289,7 +310,7 @@ export function StoreProvider({ children }) {
   }, [db, settings, active?.id, flushSettings, refreshList])
 
   const clearTimetable = useCallback(() => guard(async () => {
-    await confirmThen({ title: 'Clear timetable', message: 'Delete the generated timetable? Your tables are kept, so you can generate it again.', confirmLabel: 'Clear timetable' }, () => api(`/databases/${active.id}/timetable`, { method: 'PUT', body: { timetable: null } }))
+    await confirmThen({ title: 'Clear timetable', message: 'Delete the generated timetable? Your tables are kept, so you can generate it again.', confirmLabel: 'Clear timetable', password: true }, (adminPassword) => api(`/databases/${active.id}/timetable`, { method: 'PUT', body: { timetable: null, adminPassword } }))
     setActive((a) => ({ ...a, timetable: null }))
   }).catch(() => {}), [guard, confirmThen, active])
 
@@ -307,6 +328,7 @@ export function StoreProvider({ children }) {
 
   // Rebuild the TimeSlots table from General Settings (school days x available periods).
   // Resolves to an error string, or '' on success.
+  // Resolves to an error message, '' when done, or null when the user cancelled.
   const applyTimeSlots = useCallback(async () => {
     const periods = Array.from({ length: settings.periodsPerDay }, (_, i) => i + 1)
     const days = WEEK.filter((d) => settings.schoolDays.includes(d))
@@ -323,10 +345,10 @@ export function StoreProvider({ children }) {
     }
     if (!rows.length) return 'Mark at least one day/period as available first.'
     try {
-      await importRows({ TimeSlots: rows }, { replace: true })
+      await importRows({ TimeSlots: rows }, { replace: true, ask: { title: 'Replace Time Slots', confirmLabel: 'Replace', intro: `The grid below becomes ${plural(rows.length, 'time slot')}.` } })
       return ''
     } catch (e) {
-      return e.message
+      return e.cancelled ? null : e.message
     }
   }, [settings, importRows])
 
