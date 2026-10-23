@@ -9,6 +9,7 @@ import Login from './pages/Login'
 import Overview from './pages/Overview'
 import TablePage from './pages/TablePage'
 import Timetable from './pages/Timetable'
+import Workload from './pages/Workload'
 import './App.css'
 
 function Shell() {
@@ -27,6 +28,7 @@ function Shell() {
           <NavLink to="/" end>📊 Overview</NavLink>
           <NavLink to="/settings">⚙️ General Settings</NavLink>
           <NavLink to="/timetable">🗓️ Timetable</NavLink>
+          {isAdmin && <NavLink to="/workload">📈 Workload</NavLink>}
           {isAdmin && <NavLink to="/approvals">✅ Approvals{pendingCount > 0 && <span className="pill">{pendingCount}</span>}</NavLink>}
           <p className="nav-title">Data tables</p>
           {TABLE_ORDER.filter((n) => n !== 'TeacherPreferences').map((n) => (
@@ -49,6 +51,7 @@ function Shell() {
           <Route path="/settings" element={<GeneralSettings />} />
           <Route path="/timetable" element={<Timetable />} />
           <Route path="/approvals" element={<Approvals />} />
+          <Route path="/workload" element={isAdmin ? <Workload /> : <Navigate to="/" replace />} />
           <Route path="/table/:name" element={<TablePage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

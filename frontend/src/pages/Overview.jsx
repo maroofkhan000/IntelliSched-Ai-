@@ -46,8 +46,8 @@ export default function Overview() {
 
   const checks = [
     { ok: h.counts.sections > 0 && h.counts.subjects > 0 && h.counts.teachers > 0 && h.counts.rooms > 0 && h.counts.slots > 0, label: 'Core tables have data', detail: 'Sections, Subjects, Teachers, Rooms and Time Slots must each have at least one approved row.' },
-    { ok: h.unassigned.length === 0 && h.counts.sections > 0, label: `Every section-subject has a teacher`, detail: h.unassigned.length ? `${h.unassigned.length} section-subject pairs unassigned, e.g. ${h.unassigned.slice(0, 3).map((u) => `${u.section}/${u.subject}`).join(', ')}` : 'All covered.' },
-    { ok: h.overloaded.length === 0, label: 'No teacher exceeds max weekly load', detail: h.overloaded.length ? h.overloaded.slice(0, 4).map((o) => `${o.id} ${o.load}/${o.max}h`).join(', ') : 'All within limits.' },
+    { ok: h.unassigned.length === 0 && h.counts.sections > 0, label: `Every section-subject has a teacher`, detail: h.unassigned.length ? `${h.unassigned.length} section-subject pairs unassigned, e.g. ${h.unassigned.slice(0, 3).map((u) => `${u.section}/${u.subject}`).join(', ')}` : 'All covered.', workload: true },
+    { ok: h.overloaded.length === 0, label: 'No teacher exceeds max weekly load', workload: true, detail: h.overloaded.length ? h.overloaded.slice(0, 4).map((o) => `${o.id} ${o.load}/${o.max}h`).join(', ') : 'All within limits.' },
     { ok: h.tooBig.length === 0, label: 'Every section fits in the largest classroom', detail: h.tooBig.length ? `${h.tooBig.length} sections larger than ${h.maxClass} seats` : 'All fit.' },
     { ok: !h.hasLab || h.labRooms > 0, label: 'Lab rooms exist for lab subjects', detail: h.hasLab && !h.labRooms ? 'Lab subjects exist but no Lab room is defined.' : 'OK.' },
     { ok: h.demand <= h.supply || h.supply === 0, warn: true, label: 'Room-hours cover weekly demand', detail: `Demand ${h.demand} session-hours vs. supply ${h.supply} room-hours (${h.supply ? (h.demand / h.supply).toFixed(2) : '–'}×). ${h.demand > h.supply ? 'Scope the term (e.g. odd or even semesters only) before generating.' : ''}` },
@@ -124,7 +124,7 @@ export default function Overview() {
           {checks.map((c) => (
             <li key={c.label} className={c.ok ? 'pass' : c.warn ? 'warn' : 'fail'}>
               <span className="mark">{c.ok ? '✓' : c.warn ? '!' : '✕'}</span>
-              <div><strong>{c.label}</strong><small>{c.detail}</small></div>
+              <div><strong>{c.label}</strong><small>{c.detail}{c.workload && isAdmin && <> <Link to="/workload">See Workload</Link></>}</small></div>
             </li>
           ))}
         </ul>

@@ -8,6 +8,7 @@ import { useStore } from '../store'
 export default function AssignmentTools() {
   const { db, isAdmin, importRows } = useStore()
   const [subject, setSubject] = useState('')
+  const [branch, setBranch] = useState('') // '' = all branches
   const [auto, setAuto] = useState(null) // null | { scope, fallback } while the dialog is open
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState({ text: '', bad: false })
@@ -15,7 +16,10 @@ export default function AssignmentTools() {
   const loads = useMemo(() => teacherLoads(db), [db])
   const approvedSubjects = db.Subjects.filter((s) => s._status === 'approved')
   const codesWithPrefs = new Set(db.TeacherPreferences.filter((p) => p._status === 'approved').map((p) => p.SubjectCode))
-  const subjectChoices = [...new Map(approvedSubjects.filter((s) => codesWithPrefs.has(s.SubjectCode)).map((s) => [s.SubjectCode, s])).values()].sort((a, b) => a.SubjectCode.localeCompare(b.SubjectCode))
+  const withPrefs = approvedSubjects.filter((s) => codesWithPrefs.has(s.SubjectCode))
+  const branchChoices = [...new Set(withPrefs.map((s) => s.BranchCode))].sort()
+  const branchCode = branchChoices.includes(branch) ? branch : ''
+  const subjectChoices = [...new Map(withPrefs.filter((s) => !branchCode || s.BranchCode === branchCode).map((s) => [s.SubjectCode, s])).values()].sort((a, b) => a.SubjectCode.localeCompare(b.SubjectCode))
   const code = subjectChoices.some((s) => s.SubjectCode === subject) ? subject : subjectChoices[0]?.SubjectCode
   const counts = useMemo(() => sectionCounts(db), [db])
   const ranked = code ? rankTeachers(db, code, loads, counts) : []
@@ -52,13 +56,20 @@ export default function AssignmentTools() {
 
         {subjectChoices.length ? (
           <>
-            <label className="field narrow">
-              <span>Subject</span>
-              <select value={code} onChange={(e) => setSubject(e.target.value)}>
-                {subjectChoices.map((s) => <option key={s.SubjectCode} value={s.SubjectCode}>{s.SubjectCode} — {s.SubjectName}</option>)}
-              </select>
-            </label>
-            <div className="grid-scroll">
+            <div className="gen-controls">
+              <label className="field"><span>Branch</span>
+                <select value={branchCode} onChange={(e) => setBranch(e.target.value)}>
+                  <option value="">All branches</option>
+                  {branchChoices.map((b) => <option key={b} value={b}>{b}</option>)}
+                </select>
+              </label>
+              <label className="field"><span>Subject</span>
+                <select value={code} onChange={(e) => setSubject(e.target.value)}>
+                  {subjectChoices.map((s) => <option key={s.SubjectCode} value={s.SubjectCode}>{s.SubjectCode} — {s.SubjectName}</option>)}
+                </select>
+              </label>
+            </div>
+            <div className="grid-scroll spaced">
               <table className="grid">
                 <thead><tr><th>#</th><th>Teacher</th><th>Type</th><th className="num">Priority</th><th className="num">Experience (yrs)</th><th className="num">Sections held</th><th>Same branch</th><th className="num">Load</th></tr></thead>
                 <tbody>

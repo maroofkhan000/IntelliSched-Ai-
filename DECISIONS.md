@@ -155,10 +155,11 @@ Format per entry: **Context** (the problem), **Decision**, **Why**, **Trade-offs
 - **Teacher type:** A Theory or Lab teacher takes subjects of their own type first. When none is free, a teacher of the other type who listed the subject covers it, and the suggestion is marked "theory teacher covering a lab subject". The real data needed this: DSAI and CE have labs but no lab teachers.
 - **Trade-offs:** Generating now writes rows. Pairs no teacher can take are still listed as unscheduled, now with the exact reason (wrong type, everyone at max load, or nobody listed it).
 
-## D19. A branch in use can't be deleted (Oct 2026)
+## D19. A branch or subject in use can't be deleted (Oct 2026)
 
-- **Decision:** Deleting or rejecting a branch is refused while sections, subjects or teachers still use its code. The server checks this (`branchesFree`), and the app checks it before the confirm dialog opens.
-- **Why:** A deleted EEE branch left two sections pointing at nothing.
+- **Decision:** Deleting or rejecting a branch is refused while sections, subjects or teachers still use its code. Deleting or rejecting a subject is refused while a teaching assignment for that branch still uses it. The server checks this (`rowsFree`), and the app checks it before the confirm dialog opens (`checkInUse` in `store.jsx`).
+- **Why:** A deleted EEE branch left two sections pointing at nothing. A deleted CS131 left two teaching assignments that counted as 0 hours and could no longer be scheduled.
+- **Trade-offs:** Teacher preferences don't block a subject delete; a preference for a deleted subject is simply never used.
 
 ## D20. The app feeds the ML pipeline (Oct 2026)
 

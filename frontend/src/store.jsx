@@ -15,6 +15,23 @@ const recall = () => {
   try { return localStorage.getItem(ACTIVE_KEY) } catch { return null }
 }
 
+// Same rule as the server (rowsFree): a branch still used by sections, subjects or teachers, or a
+// subject a section still has a teacher for, can't be deleted or rejected. Throws the reason.
+const checkInUse = (data, table, ids) => {
+  const picked = (data[table] ?? []).filter((r) => ids.includes(r._id))
+  if (table === 'Branches') {
+    const codes = new Set(picked.map((b) => b.BranchCode))
+    const using = ['Sections', 'Subjects', 'Teachers'].map((t) => [t, data[t].filter((r) => codes.has(r.BranchCode)).length]).filter(([, n]) => n)
+    if (using.length) throw new Error(`Can't delete ${codes.size === 1 ? `branch ${[...codes][0]}` : `these ${codes.size} branches`}: ${using.map(([t, n]) => `${n} ${TABLES[t].label.toLowerCase()}`).join(', ')} still belong to ${codes.size === 1 ? 'it' : 'them'}. Delete or move those first.`)
+  }
+  if (table === 'Subjects') {
+    const keys = new Set(picked.map((s) => `${s.BranchCode}|${s.SubjectCode}`))
+    const used = data.TeacherSubjectMap.filter((m) => keys.has(`${m.BranchCode}|${m.SubjectCode}`))
+    const codes = [...new Set(used.map((m) => m.SubjectCode))]
+    if (used.length) throw new Error(`Can't delete ${codes.length === 1 ? `subject ${codes[0]}` : `subjects ${codes.join(', ')}`}: ${used.length} teaching assignment${used.length === 1 ? '' : 's'} still use${used.length === 1 ? 's' : ''} ${codes.length === 1 ? 'it' : 'them'}. Delete those assignments first.`)
+  }
+}
+
 const Ctx = createContext(null)
 export const useStore = () => useContext(Ctx)
 
@@ -204,11 +221,7 @@ export function StoreProvider({ children }) {
   }, [active?.id, guard, refreshList])
 
   const deleteRows = useCallback((table, ids) => guard(async () => {
-    if (table === 'Branches') { // same rule as the server: a branch in use can't be deleted
-      const codes = new Set(active.data.Branches.filter((b) => ids.includes(b._id)).map((b) => b.BranchCode))
-      const using = ['Sections', 'Subjects', 'Teachers'].map((t) => [t, active.data[t].filter((r) => codes.has(r.BranchCode)).length]).filter(([, n]) => n)
-      if (using.length) throw new Error(`Can't delete ${codes.size === 1 ? `branch ${[...codes][0]}` : `these ${codes.size} branches`}: ${using.map(([t, n]) => `${n} ${TABLES[t].label.toLowerCase()}`).join(', ')} still belong to ${codes.size === 1 ? 'it' : 'them'}. Delete or move those first.`)
-    }
+    checkInUse(active.data, table, ids)
     const whole = ids.length === (active.data[table] ?? []).length
     await confirmThen(
       {
@@ -230,6 +243,7 @@ export function StoreProvider({ children }) {
   const setStatus = useCallback((table, ids, status) => guard(async () => {
     const send = (adminPassword) => api(`/databases/${active.id}/tables/${table}/status`, { method: 'POST', body: { ids, status, adminPassword } })
     if (status === 'rejected') {
+      checkInUse(active.data, table, ids)
       await confirmThen({ title: 'Reject entries', message: `Rejecting deletes ${plural(ids.length, 'row')} from ${table}.`, confirmLabel: 'Reject', password: needsPw(ids.length), skipConfirm: true }, send)
     } else await send()
     const set = new Set(ids)

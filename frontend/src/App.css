@@ -1309,6 +1309,70 @@ p.errors {
   margin: 14px 0;
   line-height: 1.5;
 }
+.grid-scroll.spaced {
+  margin-top: 14px;
+}
+
+/* ---------- workload page ---------- */
+.dept-pick {
+  min-width: 200px;
+}
+.field .seg {
+  margin-top: 0;
+}
+.bad-text {
+  color: var(--bad);
+}
+/* --h (0–100) sets how much brand colour a heatmap cell gets */
+.grid.heat td.h {
+  background: color-mix(in srgb, var(--brand) calc(var(--h) * 0.85%), var(--surface));
+  color: var(--text);
+}
+.grid.heat tbody tr.click {
+  cursor: pointer;
+}
+.grid.heat .link.name {
+  padding: 0;
+  font-size: inherit;
+  color: var(--text);
+  text-align: left;
+}
+.grid.heat tr.click:hover .link.name {
+  color: var(--brand);
+  text-decoration: underline;
+}
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+  margin: 14px 0 0;
+}
+.facts dt {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.facts dd {
+  margin: 2px 0 0;
+  font-weight: 600;
+}
+.grid.heat td.h.dark {
+  color: var(--on-brand);
+}
+.grid.heat td.load.over {
+  background: color-mix(in srgb, var(--bad) 22%, var(--surface));
+  color: var(--bad);
+  font-weight: 600;
+}
+.grid.heat td.load {
+  font-weight: 600;
+}
+.grid.heat tfoot td {
+  position: sticky;
+  bottom: 0;
+  background: var(--surface);
+  font-weight: 600;
+  border-top: 2px solid var(--line);
+}
 .grid-scroll.short {
   max-height: 320px;
   margin-top: 12px;

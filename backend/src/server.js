@@ -263,9 +263,19 @@ app.post('/api/databases/:id/teachers', withDb, wrap(async (req, res) => {
   res.json({ teacher: store.toRow(teacherDoc), preferences: now.map(store.toRow) })
 }))
 
-// A branch can't be deleted while sections, subjects or teachers still belong to it: they would be
-// left pointing at a branch that no longer exists. Sends the error itself and returns false.
-const branchesFree = async (req, res, filter) => {
+// A branch can't be deleted while sections, subjects or teachers still belong to it, and a subject
+// can't be deleted while a section has a teacher assigned to it: they would be left pointing at
+// something that no longer exists. Sends the error itself and returns false.
+const rowsFree = async (req, res, filter) => {
+  if (req.params.table === 'Subjects') {
+    const subs = await store.rows.find(filter).toArray()
+    if (!subs.length) return true
+    const used = await store.rows.find({ dbId: req.dbDoc._id, table: 'TeacherSubjectMap', $or: subs.map((s) => ({ SubjectCode: s.SubjectCode, BranchCode: s.BranchCode })) }).toArray()
+    if (!used.length) return true
+    const codes = [...new Set(used.map((m) => m.SubjectCode))]
+    fail(res, 409, `Can't delete ${codes.length === 1 ? `subject ${codes[0]}` : `subjects ${codes.join(', ')}`}: ${used.length} teaching assignment${used.length === 1 ? '' : 's'} still use${used.length === 1 ? 's' : ''} ${codes.length === 1 ? 'it' : 'them'}. Delete those assignments first.`)
+    return false
+  }
   if (req.params.table !== 'Branches') return true
   const codes = (await store.rows.find(filter).toArray()).map((b) => b.BranchCode)
   const using = []
@@ -284,7 +294,7 @@ app.post('/api/databases/:id/tables/:table/rows/delete', withDb, withTable, wrap
   if (req.user.role !== 'admin') Object.assign(filter, { _status: 'pending', _by: req.user.username })
   const count = await store.rows.countDocuments(filter)
   // a feeder can only reach their own pending rows, so they never need (or get to test) the admin password
-  if (!(await branchesFree(req, res, filter))) return
+  if (!(await rowsFree(req, res, filter))) return
   if (req.user.role === 'admin' && !(await adminPasswordOk(req, res, count))) return
   const gone = req.params.table === 'Teachers' ? (await store.rows.find(filter).toArray()).map((t) => t.TeacherID) : []
   const r = await store.rows.deleteMany(filter)
@@ -300,7 +310,7 @@ app.post('/api/databases/:id/tables/:table/status', adminOnly, withDb, withTable
   const tids = req.params.table === 'Teachers' ? (await store.rows.find(filter).toArray()).map((t) => t.TeacherID) : []
   const prefFilter = { dbId: req.dbDoc._id, table: 'TeacherPreferences', TeacherID: { $in: tids } }
   if (status === 'rejected') {
-    if (!(await branchesFree(req, res, filter))) return
+    if (!(await rowsFree(req, res, filter))) return
     const count = await store.rows.countDocuments(filter)
     if (!(await adminPasswordOk(req, res, count, `Rejecting ${count} row${count === 1 ? '' : 's'}`))) return
     await store.rows.deleteMany(filter)
