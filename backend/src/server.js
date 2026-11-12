@@ -4,7 +4,7 @@ import cors from 'cors'
 import express from 'express'
 import jwt from 'jsonwebtoken'
 import { randomUUID } from 'node:crypto'
-import { TABLES, TABLE_ORDER, defaultSettings, recordKey, topPriorityError, validateRow, withDerived } from './schema.js'
+import { TABLES, TABLE_ORDER, WEEK, breakAfter, defaultSettings, effectiveTimings, recordKey, topPriorityError, validateRow, withDerived } from './schema.js'
 import * as store from './db.js'
 
 for (const k of ['MONGODB_URI', 'JWT_SECRET', 'ADMIN_USERNAME', 'ADMIN_PASSWORD', 'FEEDER_USERNAME', 'FEEDER_PASSWORD']) if (!process.env[k]?.trim()) throw new Error(`Missing ${k} (set it in backend/.env locally, or in Vercel's environment variables)`)
@@ -76,6 +76,32 @@ app.post('/api/auth/login', wrap(async (req, res) => {
 }))
 
 app.get('/api/auth/me', auth, (req, res) => res.json({ user: publicUser(req.user) }))
+
+// ---------- read-only timetable feed for the view site (ProjectViewSection) ----------
+// Sits before the login check: it takes an API key instead, and sends only what's needed to show a
+// timetable, never the tables, stats or unscheduled list.
+const apiKey = (req, res, next) => {
+  const key = process.env.TIMETABLE_API_KEY
+  if (!key || req.get('x-api-key') !== key) return fail(res, 401, 'Invalid API key.')
+  next()
+}
+const FEED_FIELDS = ['SectionID', 'Day', 'Period', 'SubjectCode', 'SubjectName', 'Type', 'TeacherID', 'TeacherName', 'RoomID', 'cont']
+const feedEntry = (e) => Object.fromEntries(FEED_FIELDS.filter((k) => e[k] !== undefined).map((k) => [k, e[k]]))
+
+app.get('/api/public/timetables', apiKey, wrap(async (_req, res) => {
+  const list = await store.databases.find({ timetable: { $exists: true } }, { projection: { name: 1, 'timetable.generatedAt': 1 } }).toArray()
+  res.json(list.map((d) => ({ id: d._id, name: d.name, generatedAt: d.timetable.generatedAt })))
+}))
+
+app.get('/api/public/timetables/:id', apiKey, wrap(async (req, res) => {
+  const d = await store.databases.findOne({ _id: req.params.id })
+  if (!d?.timetable) return fail(res, 404, 'No timetable saved.')
+  const s = { ...defaultSettings(), ...d.settings }
+  const timings = effectiveTimings(s)
+  const periods = Array.from({ length: Number(s.periodsPerDay) || 0 }, (_, i) => i + 1).map((p) => ({ period: p, start: timings[p]?.start ?? '', end: timings[p]?.end ?? '', break: breakAfter(s, p) }))
+  const { generatedAt, scope, entries } = d.timetable
+  res.json({ id: d._id, name: d.name, generatedAt, scope, days: WEEK.filter((x) => s.schoolDays.includes(x)), periods, entries: entries.map(feedEntry) })
+}))
 
 app.use('/api', auth)
 
