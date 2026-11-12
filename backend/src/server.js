@@ -81,7 +81,7 @@ app.get('/api/auth/me', auth, (req, res) => res.json({ user: publicUser(req.user
 // Sits before the login check: it takes an API key instead, and sends only what's needed to show a
 // timetable, never the tables, stats or unscheduled list.
 const apiKey = (req, res, next) => {
-  const key = process.env.TIMETABLE_API_KEY
+  const key = process.env.TIMETABLE_API_KEY || process.env.MAIN_API_KEY // either name; the view site calls it MAIN_API_KEY
   if (!key || req.get('x-api-key') !== key) return fail(res, 401, 'Invalid API key.')
   next()
 }
